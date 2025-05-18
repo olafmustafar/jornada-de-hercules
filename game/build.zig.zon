@@ -2,6 +2,7 @@
     .name = .game,
     .version = "0.0.0",
     .minimum_zig_version = "0.14.0",
+    .fingerprint = 0x232b318c5b9fedc5,
     .dependencies = .{
         .raylib = .{
             .url = "git+https://github.com/raysan5/raylib.git#11e15ab2ac3d943b3d9bf252f47f842e65f4e821",
