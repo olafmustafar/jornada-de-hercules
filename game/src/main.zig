@@ -7,8 +7,18 @@ const window_h = 600;
 
 const Type = enum { mountain, ocean, plane, sand, trees };
 
+const TileGrid = std.ArrayList(std.ArrayList(Type));
+
+// const World = struct {
+//     tiles: TileGrid,
+// };
+
 pub fn vec3(x: f32, y: f32, z: f32) rl.Vector3 {
     return rl.Vector3{ .x = x, .y = y, .z = z };
+}
+
+pub fn vec2(x: f32, y: f32) rl.Vector2 {
+    return rl.Vector2{ .x = x, .y = y };
 }
 
 pub fn main() !void {
@@ -18,21 +28,10 @@ pub fn main() !void {
     rl.SetConfigFlags(rl.FLAG_MSAA_4X_HINT);
     defer rl.CloseWindow();
 
-    const shader = rl.LoadShader("assets/shaders/glsl330/lighting.vs", "assets/shaders/glsl330/lighting.fs");
+    const shader = rl.LoadShader("assets/shaders/glsl100/lighting.vs", "assets/shaders/glsl100/lighting.fs");
     defer rl.UnloadShader(shader);
 
-    shader.locs[rl.SHADER_LOC_VECTOR_VIEW] = rl.GetShaderLocation(shader, "viewPos");
-    const ambientLoc = rl.GetShaderLocation(shader, "ambient");
-
-    rl.SetShaderValue(shader, ambientLoc, &[4]f32{ 0.1, 0.1, 0.1, 1.0 }, rl.SHADER_UNIFORM_VEC4);
-
-    const lights = [rll.MAX_LIGHTS]rll.Light{
-        rll.CreateLight(rll.Light.Type.point, vec3(-2, 1, -2), rl.Vector3Zero(), rl.YELLOW, shader),
-        rll.CreateLight(rll.Light.Type.point, vec3(2, 1, 2), rl.Vector3Zero(), rl.RED, shader),
-        rll.CreateLight(rll.Light.Type.point, vec3(-2, 1, 2), rl.Vector3Zero(), rl.GREEN, shader),
-        rll.CreateLight(rll.Light.Type.point, vec3(2, 1, -2), rl.Vector3Zero(), rl.BLUE, shader),
-    };
-    // const light = rll.CreateLight(rll.Light.Type.point, vec3(-2, 1, -2), rl.Vector3Zero(), rl.RED, shader);
+    var light = rll.CreateLight(rll.Light.Type.point, vec3(-2, 1, -2), rl.Vector3Zero(), rl.WHITE, shader);
 
     var camera = rl.Camera3D{
         .position = vec3(10.0, 5.0, 10.0),
@@ -43,24 +42,19 @@ pub fn main() !void {
     };
 
     const models = [_]rl.Model{
-        rl.LoadModel("assets/mountain.glb"),
         rl.LoadModel("assets/mountain_sqr.glb"),
-        rl.LoadModel("assets/ocean.glb"),
         rl.LoadModel("assets/ocean_sqr.glb"),
-        rl.LoadModel("assets/plane.glb"),
         rl.LoadModel("assets/plane_sqrt.glb"),
-        rl.LoadModel("assets/sand.glb"),
         rl.LoadModel("assets/sand_sqr.glb"),
-        rl.LoadModel("assets/trees.glb"),
         rl.LoadModel("assets/trees_srq.glb"),
     };
+    defer for (models) |model| rl.UnloadModel(model);
 
-    defer for (models) |model| {
-        rl.UnloadModel(model);
-    };
+    for (models) |model| model.materials[1].shader = shader;
 
     while (!rl.WindowShouldClose()) {
         rl.UpdateCamera(&camera, rl.CAMERA_FREE);
+
         rl.SetShaderValue(
             shader,
             shader.locs[rl.SHADER_LOC_VECTOR_VIEW],
@@ -68,40 +62,18 @@ pub fn main() !void {
             rl.SHADER_UNIFORM_VEC3,
         );
 
-        for (0..rll.MAX_LIGHTS) |i| {
-            rll.UpdateLightValues(shader, lights[i]);
-        }
+        light.position = camera.position;
+        rll.UpdateLightValues(shader, light);
 
         rl.BeginDrawing();
+        rl.BeginMode3D(camera);
         {
-            rl.ClearBackground(rl.RAYWHITE);
-
-            rl.BeginMode3D(camera);
-            {
-                rl.BeginShaderMode(shader);
-                {
-                    rl.DrawPlane(rl.Vector3Zero(), rl.Vector2{ .x = 10.0, .y = 10.0 }, rl.WHITE);
-                    rl.DrawCube(rl.Vector3Zero(), 2.0, 4.0, 2.0, rl.WHITE);
-                    for (models, 0..) |model, i| {
-                        rl.DrawModel(model, vec3(@floatFromInt(i * 2), 0, 0), 1.0, rl.WHITE);
-                    }
-                }
-                rl.EndShaderMode();
-
-                for (0..rll.MAX_LIGHTS) |i| {
-                    if (lights[i].enabled) {
-                        rl.DrawSphereEx(lights[i].position, 0.2, 8, 8, lights[i].color);
-                    } else {
-                        rl.DrawSphereWires(lights[i].position, 0.2, 8, 8, rl.ColorAlpha(lights[i].color, 0.3));
-                    }
-                }
-
-                rl.DrawSphere(camera.target, 0.05, rl.RED);
-
-                rl.DrawGrid(25, 1.0);
-            }
-            rl.EndMode3D();
+            rl.ClearBackground(rl.DARKGRAY);
+            for (models, 0..) |model, i| rl.DrawModel(model, vec3(@floatFromInt(i * 2), 0, 0), 1.0, rl.WHITE);
+            rl.DrawSphere(camera.target, 0.05, rl.RED);
+            rl.DrawGrid(25, 1.0);
         }
+        rl.EndMode3D();
         rl.EndDrawing();
     }
 }
