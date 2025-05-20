@@ -7,12 +7,6 @@ const window_h = 600;
 
 const Type = enum { mountain, ocean, plane, sand, trees };
 
-const TileGrid = std.ArrayList(std.ArrayList(Type));
-
-// const World = struct {
-//     tiles: TileGrid,
-// };
-
 pub fn vec3(x: f32, y: f32, z: f32) rl.Vector3 {
     return rl.Vector3{ .x = x, .y = y, .z = z };
 }
@@ -69,7 +63,16 @@ pub fn main() !void {
         rl.BeginMode3D(camera);
         {
             rl.ClearBackground(rl.DARKGRAY);
-            for (models, 0..) |model, i| rl.DrawModel(model, vec3(@floatFromInt(i * 2), 0, 0), 1.0, rl.WHITE);
+
+            for (0..100) |i|
+                for (0..100) |j|
+                    rl.DrawModel(
+                        models[@intCast(rl.GetRandomValue(0, models.len-1))],
+                        vec3(@as(f32, @floatFromInt(i)) * 0.90, 0, @as(f32, @floatFromInt(j)) * 0.90),
+                        1.0,
+                        rl.WHITE,
+                    );
+
             rl.DrawSphere(camera.target, 0.05, rl.RED);
             rl.DrawGrid(25, 1.0);
         }
