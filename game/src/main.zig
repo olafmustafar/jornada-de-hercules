@@ -14,13 +14,16 @@ const World = struct {
     shader: rl.Shader,
     light: rll.Light,
     camera: rl.Camera3D,
+    player_position: rl.Vector2,
 
     pub fn init() World {
         var self: World = undefined;
 
+        self.player_position = vec2(0, 0);
+
         self.camera = rl.Camera3D{
             .position = vec3(10.0, 5.0, 10.0),
-            .target = vec3(0.0, 0.0, 0.0),
+            .target = to_world_pos(self.player_position),
             .up = vec3(0.0, 1.0, 0.0),
             .fovy = 60.0,
             .projection = rl.CAMERA_PERSPECTIVE,
@@ -58,7 +61,9 @@ const World = struct {
     }
 
     pub fn update(self: *World) void {
-        rl.UpdateCamera(&self.camera, rl.CAMERA_FREE);
+        self.camera.target = to_world_pos(self.player_position);
+        self.camera.position = rl.Vector3Add(to_world_pos(self.player_position), vec3(0, 5, 5));
+        rl.UpdateCamera(&self.camera, rl.CAMERA_CUSTOM);
         rl.SetShaderValue(
             self.shader,
             self.shader.locs[rl.SHADER_LOC_VECTOR_VIEW],
@@ -68,6 +73,16 @@ const World = struct {
 
         self.light.position = rl.Vector3Add(self.camera.position, vec3(5, 5, 5));
         rll.UpdateLightValues(self.shader, self.light);
+
+        if (rl.IsKeyPressed(rl.KEY_D) or rl.IsKeyPressed(rl.KEY_RIGHT)) {
+            self.player_position = rl.Vector2Add(self.player_position, vec2(1, 0));
+        } else if (rl.IsKeyPressed(rl.KEY_A) or rl.IsKeyPressed(rl.KEY_LEFT)) {
+            self.player_position = rl.Vector2Add(self.player_position, vec2(-1, 0));
+        } else if (rl.IsKeyPressed(rl.KEY_W) or rl.IsKeyPressed(rl.KEY_UP)) {
+            self.player_position = rl.Vector2Add(self.player_position, vec2(0, -1));
+        } else if (rl.IsKeyPressed(rl.KEY_S) or rl.IsKeyPressed(rl.KEY_DOWN)) {
+            self.player_position = rl.Vector2Add(self.player_position, vec2(0, 1));
+        }
     }
 
     pub fn render(self: World) void {
@@ -80,7 +95,7 @@ const World = struct {
                 for (row, 0..) |tile, j|
                     rl.DrawModel(
                         self.models[@intFromEnum(tile)],
-                        vec3(@as(f32, @floatFromInt(i)) * 0.90, 0, @as(f32, @floatFromInt(j)) * 0.90),
+                        World.to_world_pos(vec2(@floatFromInt(i), @floatFromInt(j))),
                         1.0,
                         rl.WHITE,
                     );
@@ -91,6 +106,10 @@ const World = struct {
         }
         rl.EndMode3D();
         rl.EndDrawing();
+    }
+
+    fn to_world_pos(pos: rl.Vector2) rl.Vector3 {
+        return vec3(pos.x * 0.90, 0, pos.y * 0.90);
     }
 };
 
