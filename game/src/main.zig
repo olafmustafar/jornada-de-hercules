@@ -8,6 +8,14 @@ const window_h = 600;
 const Tile = enum { plane, mountain, sand, trees, ocean, count };
 const Tilemap = [100][100]Tile;
 
+pub fn vec3(x: f32, y: f32, z: f32) rl.Vector3 {
+    return rl.Vector3{ .x = x, .y = y, .z = z };
+}
+
+pub fn vec2(x: f32, y: f32) rl.Vector2 {
+    return rl.Vector2{ .x = x, .y = y };
+}
+
 const World = struct {
     tilemap: Tilemap,
     models: [@intFromEnum(Tile.count)]rl.Model,
@@ -15,11 +23,13 @@ const World = struct {
     light: rll.Light,
     camera: rl.Camera3D,
     player_position: rl.Vector2,
+    player_speed: f32,
 
     pub fn init() World {
         var self: World = undefined;
 
         self.player_position = vec2(0, 0);
+        self.player_speed = 2.00;
 
         self.camera = rl.Camera3D{
             .position = vec3(10.0, 5.0, 10.0),
@@ -74,15 +84,21 @@ const World = struct {
         self.light.position = rl.Vector3Add(self.camera.position, vec3(5, 5, 5));
         rll.UpdateLightValues(self.shader, self.light);
 
-        if (rl.IsKeyPressed(rl.KEY_D) or rl.IsKeyPressed(rl.KEY_RIGHT)) {
-            self.player_position = rl.Vector2Add(self.player_position, vec2(1, 0));
-        } else if (rl.IsKeyPressed(rl.KEY_A) or rl.IsKeyPressed(rl.KEY_LEFT)) {
-            self.player_position = rl.Vector2Add(self.player_position, vec2(-1, 0));
-        } else if (rl.IsKeyPressed(rl.KEY_W) or rl.IsKeyPressed(rl.KEY_UP)) {
-            self.player_position = rl.Vector2Add(self.player_position, vec2(0, -1));
-        } else if (rl.IsKeyPressed(rl.KEY_S) or rl.IsKeyPressed(rl.KEY_DOWN)) {
-            self.player_position = rl.Vector2Add(self.player_position, vec2(0, 1));
+        const delta = rl.GetFrameTime();
+        var movement = rl.Vector2Zero();
+        if (rl.IsKeyDown(rl.KEY_D) or rl.IsKeyDown(rl.KEY_RIGHT)) {
+            movement = rl.Vector2Add(movement, vec2(1, 0));
         }
+        if (rl.IsKeyDown(rl.KEY_A) or rl.IsKeyDown(rl.KEY_LEFT)) {
+            movement = rl.Vector2Add(movement, vec2(-1, 0));
+        }
+        if (rl.IsKeyDown(rl.KEY_W) or rl.IsKeyDown(rl.KEY_UP)) {
+            movement = rl.Vector2Add(movement, vec2(0, -1));
+        }
+        if (rl.IsKeyDown(rl.KEY_S) or rl.IsKeyDown(rl.KEY_DOWN)) {
+            movement = rl.Vector2Add(movement, vec2(0, 1));
+        }
+        self.player_position = rl.Vector2Add(self.player_position, rl.Vector2Scale(rl.Vector2Normalize(movement), delta * self.player_speed));
     }
 
     pub fn render(self: World) void {
@@ -112,14 +128,6 @@ const World = struct {
         return vec3(pos.x * 0.90, 0, pos.y * 0.90);
     }
 };
-
-pub fn vec3(x: f32, y: f32, z: f32) rl.Vector3 {
-    return rl.Vector3{ .x = x, .y = y, .z = z };
-}
-
-pub fn vec2(x: f32, y: f32) rl.Vector2 {
-    return rl.Vector2{ .x = x, .y = y };
-}
 
 pub fn main() !void {
     rl.InitWindow(window_w, window_h, "raylib [core] example - basic window");
