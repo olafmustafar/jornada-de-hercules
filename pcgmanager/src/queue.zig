@@ -18,6 +18,12 @@ pub fn Queue(comptime Child: type) type {
                 .end = null,
             };
         }
+
+        pub fn deinit(self: *Self) void{
+            while (self.dequeue()) |_| {}
+            self = undefined;
+        }
+
         pub fn enqueue(self: *Self, value: Child) !void {
             const node = try self.gpa.create(Node);
             node.* = .{ .data = value, .next = null };
@@ -36,5 +42,11 @@ pub fn Queue(comptime Child: type) type {
             }
             return start.data;
         }
+
+        pub fn last(self: *Self) ?Child {
+            const start = self.start orelse return null;
+            return start.data;
+        }
+
     };
 }
