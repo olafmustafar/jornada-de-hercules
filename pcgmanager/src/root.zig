@@ -1,5 +1,4 @@
 const std = @import("std");
-const Queue = @import("queue.zig").Queue;
 const MapGenerator = @import("MapGenerator.zig");
 
 const Position = struct {
