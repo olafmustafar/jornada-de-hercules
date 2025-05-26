@@ -11,7 +11,7 @@ pub fn main() !void {
     const alloc = std.heap.page_allocator;
     const ctx: *Context = undefined;
 
-    var generator = try MapGenerator.init(ctx, 1, alloc);
+    var generator = try MapGenerator.init(ctx, 2, alloc);
     defer generator.deinit();
 
     try generator.generate(gen_instr(1, 1));

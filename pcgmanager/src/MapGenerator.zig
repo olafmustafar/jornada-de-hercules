@@ -61,57 +61,73 @@ const Worker = struct {
         {
             gc.mutex.lock();
             defer gc.mutex.unlock();
-            while (gc.queue.items.len != 0) {
+            while (gc.queue.items.len != 0 or self.shared_context.state.get() != .waiting) {
+                std.debug.print("wait for finish\n", .{});
                 gc.cv.wait(&gc.mutex);
             }
+            std.debug.print("wait for finish OK\n", .{});
         }
-        self.shared_context.state.wait_until(.waiting);
     }
 
     fn worker_function(ctx: *SharedContext) void {
-        var instruction: Instruction = undefined;
+        var instruction_opt: ?Instruction = null;
         loop: while (true) {
             {
                 ctx.generator_context.mutex.lock();
                 defer ctx.generator_context.mutex.unlock();
-                while (ctx.generator_context.queue.items.len == 0) {
-                    std.debug.print("waiting\n", .{});
+                if (ctx.generator_context.queue.items.len == 0 and ctx.should_finish.get() == false) {
+                    std.debug.print("waiting for new instruction or finish command\n", .{});
                     ctx.state.set(.waiting);
-                    ctx.generator_context.cv.wait(&ctx.generator_context.mutex);
-
-                    if (ctx.should_finish.get()) {
-                        std.debug.print("exiting\n", .{});
-                        break :loop;
-                    }
-                }
-
-                if (ctx.generator_context.queue.pop()) |instr| {
-                    std.debug.print("working\n", .{});
-                    ctx.state.set(.working);
-                    instruction = instr;
                 }
             }
             ctx.generator_context.cv.signal();
-
-            const pos = instruction.generate.position;
-            const chunk: Chunk = .{
-                .quadrant = pos,
-                .tilemap = undefined,
-            };
-
-            std.debug.print("Generated {} on thread {}\n", .{ pos, @as(i32, @intCast(std.Thread.getCurrentId())) });
 
             {
                 ctx.generator_context.mutex.lock();
                 defer ctx.generator_context.mutex.unlock();
-                ctx.generator_context.cache.append(chunk) catch {
-                    std.debug.print("error on generation\n", .{});
-                };
-                ctx.generator_context.results.append(chunk) catch {
-                    std.debug.print("error on generation\n", .{});
-                };
+                while (ctx.generator_context.queue.items.len == 0 and ctx.should_finish.get() == false) {
+                    ctx.generator_context.cv.wait(&ctx.generator_context.mutex);
+                }
+
+                if (ctx.should_finish.get()) {
+                    std.debug.print("exiting\n", .{});
+                    break :loop;
+                }
+
+                std.debug.print("pull from queue\n", .{});
+                instruction_opt = ctx.generator_context.queue.pop();
             }
             ctx.generator_context.cv.signal();
+
+            if (instruction_opt) |instruction| {
+                std.debug.print("working\n", .{});
+                {
+                    ctx.generator_context.mutex.lock();
+                    defer ctx.generator_context.mutex.unlock();
+                    ctx.state.set(.working);
+                }
+                ctx.generator_context.cv.signal();
+
+                const pos = instruction.generate.position;
+                const chunk: Chunk = .{
+                    .quadrant = pos,
+                    .tilemap = undefined,
+                };
+
+                {
+                    ctx.generator_context.mutex.lock();
+                    defer ctx.generator_context.mutex.unlock();
+                    ctx.generator_context.cache.append(chunk) catch {
+                        std.debug.print("error on generation\n", .{});
+                    };
+                    ctx.generator_context.results.append(chunk) catch {
+                        std.debug.print("error on generation\n", .{});
+                    };
+
+                    std.debug.print("appended to results x:{} y:{}\n", .{ pos.x, pos.y });
+                }
+                ctx.generator_context.cv.signal();
+            }
         }
     }
 };
@@ -175,9 +191,9 @@ pub fn generate(self: Self, instruction: Instruction) !void {
         self.data.generator_context.mutex.lock();
         defer self.data.generator_context.mutex.unlock();
         try self.data.generator_context.queue.insert(0, instruction);
+        std.debug.print("pushed to queue\n", .{});
     }
     self.data.generator_context.cv.signal();
-    std.debug.print("pushed to queue\n", .{});
 }
 
 pub fn wait_results(self: Self) !std.ArrayList(Chunk) {
