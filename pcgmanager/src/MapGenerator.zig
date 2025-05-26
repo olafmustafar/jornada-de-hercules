@@ -76,7 +76,7 @@ const Worker = struct {
                 ctx.generator_context.mutex.lock();
                 defer ctx.generator_context.mutex.unlock();
                 if (ctx.generator_context.queue.items.len == 0 and ctx.should_finish.get() == false) {
-                    std.debug.print("waiting for new instruction or finish command\n", .{});
+                    std.debug.print("{}: waiting for new instruction or finish command\n", .{@as(i32,@intCast(std.Thread.getCurrentId()))});
                     ctx.state.set(.waiting);
                 }
             }
@@ -94,13 +94,12 @@ const Worker = struct {
                     break :loop;
                 }
 
-                std.debug.print("pull from queue\n", .{});
+                std.debug.print("{}: pull from queue\n", .{@as(i32,@intCast(std.Thread.getCurrentId()))});
                 instruction_opt = ctx.generator_context.queue.pop();
             }
             ctx.generator_context.cv.signal();
 
             if (instruction_opt) |instruction| {
-                std.debug.print("working\n", .{});
                 {
                     ctx.generator_context.mutex.lock();
                     defer ctx.generator_context.mutex.unlock();
@@ -124,7 +123,7 @@ const Worker = struct {
                         std.debug.print("error on generation\n", .{});
                     };
 
-                    std.debug.print("appended to results x:{} y:{}\n", .{ pos.x, pos.y });
+                    std.debug.print("{}: appended to results x:{} y:{}\n", .{ @as(i32,@intCast(std.Thread.getCurrentId())), pos.x, pos.y });
                 }
                 ctx.generator_context.cv.signal();
             }

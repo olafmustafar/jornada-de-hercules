@@ -1,6 +1,7 @@
 const std = @import("std");
 const pcgmanager = @import("root.zig");
 const MapGenerator = @import("MapGenerator.zig");
+const Generator = @import("Generator.zig").Generator;
 const Context = @import("Context.zig");
 
 fn gen_instr(x: i32, y: i32) MapGenerator.Instruction {
@@ -9,21 +10,21 @@ fn gen_instr(x: i32, y: i32) MapGenerator.Instruction {
 
 pub fn main() !void {
     const alloc = std.heap.page_allocator;
-    const ctx: *Context = undefined;
+    // const ctx: *Context = undefined;
 
-    var generator = try MapGenerator.init(ctx, 2, alloc);
+    var generator = try Generator.init(alloc, 3);
+    // var generator = try MapGenerator.init(ctx, 2, alloc);
     defer generator.deinit();
 
-    try generator.generate(gen_instr(1, 1));
-    try generator.generate(gen_instr(0, 0));
-    try generator.generate(gen_instr(0, 1));
-    try generator.generate(gen_instr(1, 0));
-    try generator.generate(gen_instr(2, 0));
+    try generator.add(.{});
+    try generator.add(.{});
+    try generator.add(.{});
+    try generator.add(.{});
+    try generator.add(.{});
 
     const results = try generator.wait_results();
 
-    for (results.items) |chunk| {
-        std.debug.print("chunk {d} {d}\n", .{ chunk.quadrant.x, chunk.quadrant.y });
+    for (results.items, 0..) |_, i| {
+        std.debug.print("chunk {d}\n", .{i});
     }
-
 }
