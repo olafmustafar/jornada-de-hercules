@@ -35,31 +35,18 @@ fn generate(instruction: Instruction) Chunk {
 }
 
 const WaveFunctionCollapse = struct {
-    const Rule = struct { a: Tile, b: Tile };
-    const Weights = [@intFromEnum(Tile.size)]f32;
-    const rules = [_]Rule{
-        .{ .a = .plane, .b = .plane },
-        .{ .a = .plane, .b = .mountain },
-        .{ .a = .plane, .b = .sand },
-        .{ .a = .plane, .b = .trees },
-        .{ .a = .plane, .b = .ocean },
-        .{ .a = .sand, .b = .sand },
-        .{ .a = .sand, .b = .ocean },
-        .{ .a = .sand, .b = .plane },
-        .{ .a = .trees, .b = .trees },
-        .{ .a = .trees, .b = .plane },
-        .{ .a = .trees, .b = .mountain },
-        .{ .a = .mountain, .b = .mountain },
-        .{ .a = .mountain, .b = .trees },
-        .{ .a = .mountain, .b = .plane },
-        .{ .a = .ocean, .b = .ocean },
-        .{ .a = .ocean, .b = .sand },
-        .{ .a = .ocean, .b = .plane },
+    const Direction = enum { up, right, down, left, size };
+    const Rule = struct {
+        neighbors: [@intFromEnum(Tile.size)][Direction.size]bool,
+        weight: u8,
     };
+    const Rules = [@intFromEnum(Tile.size)]Rule;
+    // const Prefab = [4][3]Tile;
 
-    weights: Weights,
     tilemap: *Tilemap,
-    // pub fn process(probabilities: ProbabilitiesVector, tilemap: *Chunk.Tilemap) void {
+    rules: Rules,
+
+    // pub fn process() void {
     //
     // }
 
@@ -75,32 +62,33 @@ const WaveFunctionCollapse = struct {
     fn entropy(self: WaveFunctionCollapse, pos: Position) f32 {
         const w = self.tilemap.len;
         const h = self.tilemap[0].len;
-        const neighbors = [_]Tile{
-            if (pos.x + 1 >= w) self.tilemap[pos.x + 1][pos.y] else .empty,
+
+        const nbrs = [_]Tile{
             if (pos.x - 1 < 0) self.tilemap[pos.x - 1][pos.y] else .empty,
-            if (pos.y + 1 >= h) self.tilemap[pos.x][pos.y + 1] else .empty,
+            if (pos.x + 1 >= w) self.tilemap[pos.x + 1][pos.y] else .empty,
             if (pos.y - 1 < 0) self.tilemap[pos.x][pos.y - 1] else .empty,
+            if (pos.y + 1 >= h) self.tilemap[pos.x][pos.y + 1] else .empty,
         };
 
-        const allowed_tiles = [_]bool{false} ** Tile.size;
-
-        for (neighbors) |tile| {
-            for (rules) |rule| {
-                if (rule.a == tile) {
-                    allowed_tiles[@intFromEnum(rule.b)] = true;
-                }
+        var possibilities = [_]bool{true} ** Tile.size;
+        for (0..possibilities.len) |tile| {
+            for (0..Direction.size) |dir| {
+                possibilities[tile] &= self.rules[nbrs[dir]].neighbors[tile][dir];
             }
         }
 
-        for(allowed_tiles, self.weights) |allowed, weight|{
-            if( allowed ){
-                weight 
+        var sum_i = 0;
+        var sum_w = 0;
+        for (0..possibilities.len) |tile_i| {
+            if (possibilities[tile_i]) {
+                sum_i += 1;
+                sum_w += self.rules[tile_i].weight;
             }
         }
-
+        //
+        //
         // shannon_entropy_for_square =
-        //   log(sum(weight)) -
-        //   (sum(weight) * log(weight)) / sum(weight))
+        //   log(sum(weight)) - ((sum(weight) * log(weight)) / sum(weight))
     }
 
     //
