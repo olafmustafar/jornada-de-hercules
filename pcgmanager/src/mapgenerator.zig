@@ -41,23 +41,23 @@ const WaveFunctionCollapse = struct {
         weight: u8,
     };
     const Rules = [@intFromEnum(Tile.size)]Rule;
-    // const Prefab = [4][3]Tile;
 
     tilemap: *Tilemap,
     rules: Rules,
 
-    // pub fn process() void {
-    //
-    // }
+    pub fn process(self: *WaveFunctionCollapse) void {
+        self.clear_tilemap();
 
-    fn clear_tilemap(tilemap: *Tilemap) void {
-        for (tilemap) |*row| {
-            for (row) |*tile|
-                tile = .empty;
-        }
+        while (!self.all_collapsed()) {}
     }
 
-    // fn lowest_entropy(tilemap: *Tilemap) Position {}
+    fn clear_tilemap(self: *WaveFunctionCollapse) void {
+        for (self.tilemap) |*row| {
+            for (row) |*tile| {
+                tile = .empty;
+            }
+        }
+    }
 
     fn entropy(self: WaveFunctionCollapse, pos: Position) f32 {
         const w = self.tilemap.len;
@@ -70,33 +70,60 @@ const WaveFunctionCollapse = struct {
             if (pos.y + 1 >= h) self.tilemap[pos.x][pos.y + 1] else .empty,
         };
 
-        var possibilities = [_]bool{true} ** Tile.size;
-        for (0..possibilities.len) |tile| {
+        var sum_w = 0;
+        var sum_w_log = 0;
+        for (0..Tile.size) |tile_i| {
+            var allowed = true;
             for (0..Direction.size) |dir| {
-                possibilities[tile] &= self.rules[nbrs[dir]].neighbors[tile][dir];
+                allowed &= self.rules[nbrs[dir]].neighbors[tile_i][dir];
+            }
+            if (allowed) {
+                const weight = self.rules[tile_i].weight;
+                sum_w += weight;
+                sum_w_log += weight * @log(weight);
             }
         }
 
-        var sum_i = 0;
-        var sum_w = 0;
-        for (0..possibilities.len) |tile_i| {
-            if (possibilities[tile_i]) {
-                sum_i += 1;
-                sum_w += self.rules[tile_i].weight;
-            }
-        }
-        //
-        //
-        // shannon_entropy_for_square =
-        //   log(sum(weight)) - ((sum(weight) * log(weight)) / sum(weight))
+        return @log(sum_w) - (sum_w_log / sum_w);
     }
 
-    //
-    // fn collapse(tilemap: *Chunk.Tilemap) void {
-    //
-    // }
+    fn collapse(self: *WaveFunctionCollapse, pos: Position) void {
+        const w = self.tilemap.len;
+        const h = self.tilemap[0].len;
+        const nbrs = [_]Tile{
+            if (pos.x - 1 < 0) self.tilemap[pos.x - 1][pos.y] else .empty,
+            if (pos.x + 1 >= w) self.tilemap[pos.x + 1][pos.y] else .empty,
+            if (pos.y - 1 < 0) self.tilemap[pos.x][pos.y - 1] else .empty,
+            if (pos.y + 1 >= h) self.tilemap[pos.x][pos.y + 1] else .empty,
+        };
 
-    // fn all_collapsed(tilemap : * Chunk.Tilemap ) void { }
+        //todo
+        //
+        var sum_w = 0;
+        var sum_w_log = 0;
+        for (0..Tile.size) |tile_i| {
+            var allowed = true;
+            for (0..Direction.size) |dir| {
+                allowed &= self.rules[nbrs[dir]].neighbors[tile_i][dir];
+            }
+            if (allowed) {
+                const weight = self.rules[tile_i].weight;
+                sum_w += weight;
+                sum_w_log += weight * @log(weight);
+            }
+        }
+    }
+
+    fn all_collapsed(self: WaveFunctionCollapse) bool {
+        for (self.tilemap) |*row| {
+            for (row) |tile| {
+                if (tile == .empty) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 };
 
 pub const MapGenerator = Generator(Instruction, Chunk, generate);
