@@ -28,8 +28,13 @@ pub fn main() !void {
         for (chunk.tilemap) |line| {
             for (line) |tile| {
                 switch (tile) {
+                    .empty => std.debug.print(" ", .{}),
                     .plane => std.debug.print(".", .{}),
                     .ocean => std.debug.print("~", .{}),
+                    .mountain => std.debug.print("^", .{}),
+                    .sand => std.debug.print("/", .{}),
+                    .trees => std.debug.print("T", .{}),
+                    .size => std.debug.print("X", .{}),
                 }
             }
             std.debug.print("\n", .{});
