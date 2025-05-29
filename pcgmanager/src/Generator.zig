@@ -2,13 +2,16 @@ const std = @import("std");
 const Context = @import("Context.zig");
 
 pub fn Generator(
-    comptime Instruction: type,
-    comptime Content: type,
-    comptime GenFn: *const fn (ctx: *Context, instruction: Instruction) Content,
+    comptime InstructionType: type,
+    comptime ContentType: type,
+    comptime GenFn: *const fn (ctx: *Context, instruction: InstructionType) ContentType,
 ) type {
-    const Queue = std.ArrayList(Instruction);
+    const Queue = std.ArrayList(InstructionType);
 
     return struct {
+        pub const Instruction = InstructionType;
+        pub const Content = ContentType;
+
         const SharedContext = struct {
             queue: Queue,
             result: std.ArrayList(Content),

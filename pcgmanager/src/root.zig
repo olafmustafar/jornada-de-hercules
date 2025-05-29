@@ -1,26 +1,27 @@
 const std = @import("std");
+const Context = @import("Context.zig");
+const RoomGenerator = @import("roomgenerator.zig").RoomGenerator;
 
-// const Position = struct {
-//     x: i32,
-//     y: i32,
-// };
-//
-// const InstructionTag = enum {
-//     map,
-//     enemies,
-// };
-//
-// const Instruction = union(InstructionTag) {
-//     map: MapGenerator.Instruction,
-//     enemies: struct {},
-// };
-//
-//
-// const Level = struct {};
-//
-// const Orquestrator = struct {
-//     pub fn addChunk(_: Orquestrator, _: MapGenerator.Chunk) void {}
-//     pub fn Orquestrate(_: Orquestrator) Level {}
-// };
-//
-const PCGManager = struct {};
+const PCGManager = struct {
+    context: *Context,
+    room_generator: RoomGenerator,
+    gpa: std.mem.Allocator,
+
+    pub fn init(allocator: std.mem.Allocator) !PCGManager {
+        var context = allocator.create(Context);
+        context.* = .init();
+        return .{
+            .context = context,
+            .room_generator = try .init(&context, 3, allocator),
+        };
+    }
+
+    pub fn deinit(self: *PCGManager) void {
+        self.room_generator.deinit();
+        self.gpa.destroy(self.context);
+    }
+
+    pub fn generate(self: *PCGManager, instruction: RoomGenerator.Instruction) void {
+        self.room_generator.add(instruction);
+    }
+};
