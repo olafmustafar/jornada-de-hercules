@@ -99,7 +99,7 @@ const World = struct {
 
     pub fn update(self: *World) void {
         self.camera.target = to_world_pos(self.player_position);
-        self.camera.position = rl.Vector3Add(to_world_pos(self.player_position), vec3(0, 5, 5));
+        self.camera.position = rl.Vector3Add(to_world_pos(self.player_position), vec3(0, 7, 1));
         rl.UpdateCamera(&self.camera, rl.CAMERA_CUSTOM);
         rl.SetShaderValue(
             self.shader,
