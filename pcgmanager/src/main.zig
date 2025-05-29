@@ -6,7 +6,7 @@ const RoomGenerator = @import("roomgenerator.zig").RoomGenerator;
 pub fn main() !void {
     const alloc = std.heap.page_allocator;
 
-    var context = Context.init();
+    var context = Context.init(alloc);
 
     var generator = try RoomGenerator.init(&context, 3, alloc);
     defer generator.deinit();
