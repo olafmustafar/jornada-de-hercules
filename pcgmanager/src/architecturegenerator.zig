@@ -132,4 +132,4 @@ fn generate_architecture(ctx: *Context, max_diameter: u8) Architecture {
     }
 }
 
-pub const ArchitectureGenerator = Generator(Instruction, Chunk, generate);
+pub const ArchitectureGenerator = Generator(Instruction, Architecture, generate);

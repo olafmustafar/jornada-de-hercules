@@ -86,7 +86,7 @@ fn generate(ctx: *Context, instruction: Instruction) Room {
     }
 }
 
-fn get_random_room(rnd: std.Random) void {
+fn get_random_room(rnd: std.Random) Room {
     var room: Room = undefined;
     const i = rnd.intRangeAtMost(usize, 0, rooms.len - 1);
     var it = std.mem.splitSequence(u8, rooms[i], "\n");
@@ -98,6 +98,7 @@ fn get_random_room(rnd: std.Random) void {
         }
         row += 1;
     }
+    return room;
 }
 
 pub const RoomGenerator = Generator(Instruction, Room, generate);

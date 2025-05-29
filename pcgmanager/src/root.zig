@@ -2,7 +2,7 @@ const std = @import("std");
 const Context = @import("Context.zig");
 const RoomGenerator = @import("roomgenerator.zig").RoomGenerator;
 
-const PCGManager = struct {
+pub const PCGManager = struct {
     context: *Context,
     room_generator: RoomGenerator,
     gpa: std.mem.Allocator,
