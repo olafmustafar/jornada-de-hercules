@@ -13,14 +13,32 @@ pub fn main() !void {
     var generator = try ArchitectureGenerator.init(&context, 1, alloc);
     defer generator.deinit();
 
-    try generator.add(.{.generate = .{.diameter = 10}});
+    try generator.add(.{ .generate = .{
+        .diameter = 20,
+        .branch_chance = 0.25,
+        .branch_diameter = 5,
+    } });
     const results = try generator.wait_results();
 
+    var yey = std.mem.zeroes([30][30]bool);
     for (results.items) |arch| {
-        for( arch.items )
-        
-    };
+        for (arch.items) |node| {
+            yey[@intCast(node.pos.y + 15)][@intCast(node.pos.x + 15)] = true;
+        }
+    }
 
+    for (yey) |line| {
+        for (line) |b| {
+            if (b) {
+                std.debug.print("[]", .{});
+            } else {
+                std.debug.print("..", .{});
+            }
+        }
+        std.debug.print("\n", .{});
+    }
+
+    //
     // for (results.items) |room| {
     //     for (room) |line| {
     //         for (line) |tile| {
