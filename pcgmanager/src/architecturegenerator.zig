@@ -96,17 +96,14 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
         }
 
         var origin = &architecture.items[expand.origin_idx];
-        var directions: [4]Direction = undefined;
-        var dir_i: usize = 0;
 
-        // add all possible directions to expand to
-        var origin_dirs = origin.directions.iterator();
-        while (origin_dirs.next()) |pair| {
-            const newpos = origin.pos.move(pair.key);
-            if (!pair.value.* and position_set.getEntry(newpos) == null) {
-                directions[dir_i] = pair.key;
-                dir_i += 1;
-            }
+        if (rnd.float() < args.change_direction_chance) {
+            const random_dir_opt = choose_random_available_direction(rnd, origin.pos, origin.directions, position_set);
+        }
+
+        if (position_set.getEntry(origin.pos.move(expand.direction)) != null) {
+
+
         }
 
         if (dir_i == 0) {
@@ -125,13 +122,6 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
                 });
             }
             continue;
-        }
-
-        const dir = undefined;
-        if (rnd.float(f32) < args.change_direction_chance) {
-            dir = directions[rnd.uintAtMost(usize, dir_i - 1)];
-        } else {
-            expand.direction;
         }
 
         origin.directions.set(dir, true);
@@ -170,6 +160,21 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
     }
 
     return architecture;
+}
+
+fn choose_random_available_direction(rnd: std.Random, current_pos: Position, available: std.EnumArray(Direction, bool), occupied_pos: std.AutoHashMap(Position, void)) ?Direction {
+    var directions: [4]Direction = undefined;
+    var dir_i: usize = 0;
+    var available_it = available.iterator();
+    while (available_it.next()) |pair| {
+        const newpos = current_pos.move(pair.key);
+        if (!pair.value.* and occupied_pos.getEntry(newpos) == null) {
+            directions[dir_i] = pair.key;
+            dir_i += 1;
+        }
+    }
+
+    return directions[rnd.uintAtMost(usize, 0, dir_i - 1)];
 }
 
 pub const ArchitectureGenerator = Generator(Instruction, Architecture, generate);
