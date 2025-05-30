@@ -97,16 +97,16 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
 
         var origin = &architecture.items[expand.origin_idx];
 
+        var dir_opt: ?Direction = false;
         if (rnd.float() < args.change_direction_chance) {
-            const random_dir_opt = choose_random_available_direction(rnd, origin.pos, origin.directions, position_set);
+            dir_opt = choose_random_available_direction(rnd, origin.pos, origin.directions, position_set);
+        } else if (position_set.getEntry(origin.pos.move(expand.direction)) != null) {
+            dir_opt = expand.direction;
+        } else {
+            dir_opt = null;
         }
 
-        if (position_set.getEntry(origin.pos.move(expand.direction)) != null) {
-
-
-        }
-
-        if (dir_i == 0) {
+        if (dir_opt == null) {
             //nowhere to expand to
             if (!expand.is_branch) {
                 // TODO failure too high, first create path then only  after create branches
@@ -124,6 +124,7 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
             continue;
         }
 
+        // position_set.put(dir, {});
         origin.directions.set(dir, true);
 
         var new_node = Node{
