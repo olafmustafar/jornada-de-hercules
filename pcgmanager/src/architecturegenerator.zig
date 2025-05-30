@@ -6,6 +6,7 @@ pub const Architecture = std.ArrayList(Node);
 
 pub const GenerateArgs = struct {
     diameter: usize,
+    change_direction_chance: f32,
     branch_diameter: usize,
     branch_chance: f32,
 };
@@ -56,6 +57,7 @@ const Expand = struct {
     origin_idx: usize,
     is_branch: bool,
     diameter_left: usize,
+    direction: Direction,
 };
 
 fn generate(ctx: *Context, instruction: Instruction) Architecture {
@@ -84,6 +86,7 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
         .is_branch = true,
         .origin_idx = architecture.items.len - 1,
         .diameter_left = args.diameter,
+        .direction = .right,
     });
 
     while (expand_queue.items.len > 0) {
@@ -110,7 +113,6 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
             //nowhere to expand to
             if (!expand.is_branch) {
                 // TODO failure too high, first create path then only  after create branches
-
                 //try again
                 position_set.clearAndFree();
                 architecture.clearAndFree();
@@ -124,7 +126,14 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
             }
             continue;
         }
-        const dir = directions[rnd.uintAtMost(usize, dir_i - 1)];
+
+        const dir = undefined;
+        if (rnd.float(f32) < args.change_direction_chance) {
+            dir = directions[rnd.uintAtMost(usize, dir_i - 1)];
+        } else {
+            expand.direction;
+        }
+
         origin.directions.set(dir, true);
 
         var new_node = Node{
@@ -141,18 +150,22 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
                 .origin_idx = architecture.items.len - 1,
                 .is_branch = true,
                 .diameter_left = expand.diameter_left - 1,
+                .direction = dir,
             });
         } else if (rnd.float(f32) < args.branch_chance) {
             try expand_queue.insert(0, .{
                 .origin_idx = architecture.items.len - 1,
                 .is_branch = true,
                 .diameter_left = args.branch_diameter,
+                .direction = dir, //new dir?
             });
         }
+
         try expand_queue.insert(0, .{
             .origin_idx = architecture.items.len - 1,
             .is_branch = false,
             .diameter_left = expand.diameter_left - 1,
+            .direction = dir,
         });
     }
 
