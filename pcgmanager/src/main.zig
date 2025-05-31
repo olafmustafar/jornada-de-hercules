@@ -15,8 +15,10 @@ pub fn main() !void {
 
     try generator.add(.{ .generate = .{
         .diameter = 20,
+        .max_corridor_length = 5,
         .branch_chance = 0.25,
         .branch_diameter = 5,
+        .change_direction_chance = 0.25,
     } });
     const results = try generator.wait_results();
 
