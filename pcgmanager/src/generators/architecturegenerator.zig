@@ -1,8 +1,11 @@
 const std = @import("std");
 const Generator = @import("Generator.zig").Generator;
-const Context = @import("Context.zig");
-
-pub const Architecture = std.ArrayList(Node);
+const Context = @import("../Context.zig");
+const contents = @import("../contents.zig");
+const Architecture = contents.Architecture;
+const Direction = contents.Direction;
+const Position = contents.Position;
+const Node = contents.Node;
 
 pub const GenerateArgs = struct {
     diameter: usize,
@@ -20,41 +23,6 @@ pub const Instruction = union(InstructionTag) {
 
 const InstructionTag = enum { generate, place_manual };
 
-pub const Direction = enum {
-    up,
-    right,
-    down,
-    left,
-
-    fn inverse(self: Direction) Direction {
-        return switch (self) {
-            .up => .down,
-            .down => .up,
-            .left => .right,
-            .right => .left,
-        };
-    }
-};
-
-pub const Position = struct {
-    x: i32,
-    y: i32,
-
-    fn move(self: Position, dir: Direction) Position {
-        switch (dir) {
-            .up => return .{ .x = self.x, .y = self.y - 1 },
-            .down => return .{ .x = self.x, .y = self.y + 1 },
-            .left => return .{ .x = self.x - 1, .y = self.y },
-            .right => return .{ .x = self.x + 1, .y = self.y },
-        }
-    }
-};
-
-pub const Node = struct {
-    pos: Position,
-    directions: std.EnumArray(Direction, bool),
-    is_branch: bool,
-};
 
 const Expand = struct {
     origin_idx: usize,

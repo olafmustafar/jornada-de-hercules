@@ -1,40 +1,15 @@
 const std = @import("std");
 const Generator = @import("Generator.zig").Generator;
-const Context = @import("Context.zig");
-
-pub const Tile = enum {
-    empty,
-    plane,
-    mountain,
-    sand,
-    trees,
-    ocean,
-    size,
-
-    const chars = std.EnumMap(Tile, u8).init(.{ .empty = ' ', .plane = '.', .ocean = '~', .mountain = '^', .sand = '/', .trees = 'T', .size = 'X' });
-
-    fn toChar(tile: Tile) u8 {
-        return chars.get(tile).?;
-    }
-
-    fn fromChar(char: u8) Tile {
-        for (0..@intFromEnum(Tile.size) + 1) |i| {
-            const tile: Tile = @enumFromInt(i);
-            if (tile.toChar() == char) {
-                return tile;
-            }
-        }
-        return Tile.empty;
-    }
-};
-
-pub const Room = [8][12]Tile;
+const Context = @import("../Context.zig");
+const contents = @import("../contents.zig");
+const Room = contents.Room;
+const Tile = contents.Tile;
 
 const InstructionTag = enum { generate, place_manual };
 
 pub const Instruction = union(InstructionTag) {
     generate: struct {},
-    place_manual: struct { room: Room },
+    place_manual: Room,
 };
 
 const rooms = [_][]const u8{
@@ -80,8 +55,8 @@ fn generate(ctx: *Context, instruction: Instruction) Room {
         .generate => |_| {
             return get_random_room(ctx.random.random());
         },
-        .place_manual => |params| {
-            return params.room;
+        .place_manual => |room| {
+            return room;
         },
     }
 }
