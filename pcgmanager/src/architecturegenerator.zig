@@ -8,7 +8,8 @@ pub const GenerateArgs = struct {
     diameter: usize,
     max_corridor_length: usize,
     change_direction_chance: f32,
-    branch_diameter: usize,
+    max_branch_diameter: usize,
+    min_branch_diameter: usize,
     branch_chance: f32,
 };
 
@@ -88,7 +89,7 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
     try expand_queue.append(Expand{
         .is_branch = false,
         .origin_idx = architecture.items.len - 1,
-        .diameter_left = args.diameter,
+        .diameter_left = args.diameter - 1,
         .direction = .right,
         .corridor_count = 0,
     });
@@ -112,6 +113,7 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
 
         var corridor_length: usize = undefined;
         var dir_opt: ?Direction = null;
+
         if (rnd.float(f32) < args.change_direction_chance or expand.corridor_count >= args.max_corridor_length) {
             corridor_length = 0;
             dir_opt = choose_random_available_direction(rnd, origin.pos, &origin.directions, position_set, expand.direction);
@@ -155,31 +157,32 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
         try position_set.put(new_node.pos, {});
         try architecture.append(new_node);
 
-        // if (expand.is_branch) {
-        //     try expand_queue.append(.{
-        //         .origin_idx = architecture.items.len - 1,
-        //         .is_branch = true,
-        //         .diameter_left = expand.diameter_left - 1,
-        //         .direction = dir,
-        //         .corridor_count = corridor_length,
-        //     });
-        // } else if (rnd.float(f32) < args.branch_chance) {
-        //     try expand_queue.append(.{
-        //         .origin_idx = architecture.items.len - 1,
-        //         .is_branch = true,
-        //         .diameter_left = args.branch_diameter,
-        //         .direction = dir, //new dir?
-        //         .corridor_count = 0,
-        //     });
-        // }
-
-        try expand_queue.append(.{
-            .origin_idx = architecture.items.len - 1,
-            .is_branch = false,
-            .diameter_left = expand.diameter_left - 1,
-            .direction = dir,
-            .corridor_count = corridor_length,
-        });
+        if (expand.is_branch) {
+            try expand_queue.append(.{
+                .origin_idx = architecture.items.len - 1,
+                .is_branch = true,
+                .diameter_left = expand.diameter_left - 1,
+                .direction = dir,
+                .corridor_count = corridor_length,
+            });
+        } else {
+            if (rnd.float(f32) < args.branch_chance and args.min_branch_diameter < expand.diameter_left) {
+                try expand_queue.append(.{
+                    .origin_idx = architecture.items.len - 1,
+                    .is_branch = true,
+                    .diameter_left = rnd.intRangeAtMost(usize, args.min_branch_diameter, args.max_branch_diameter),
+                    .direction = dir, //new dir?
+                    .corridor_count = 0,
+                });
+            }
+            try expand_queue.append(.{
+                .origin_idx = architecture.items.len - 1,
+                .is_branch = false,
+                .diameter_left = expand.diameter_left - 1,
+                .direction = dir,
+                .corridor_count = corridor_length,
+            });
+        }
     }
 
     return architecture;
