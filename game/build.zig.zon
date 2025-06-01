@@ -8,6 +8,10 @@
             .url = "git+https://github.com/raysan5/raylib.git#11e15ab2ac3d943b3d9bf252f47f842e65f4e821",
             .hash = "raylib-5.5.0-whq8uP6mMwRUaBAOJg8L7n1-I0ydGOQc5bQb2jjeFlDD",
         },
+
+        .pcgmanager = .{
+            .path = "../pcgmanager" 
+        }
     },
 
     .paths = .{

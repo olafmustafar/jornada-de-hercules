@@ -1,6 +1,7 @@
 const std = @import("std");
 const rl = @import("raylib.zig");
 const rll = @import("rlights.zig");
+const PCGManager = @import("pcgmanager").PCGManager;
 
 const window_w = 800;
 const window_h = 600;
@@ -174,6 +175,29 @@ pub fn main() !void {
     rl.DisableCursor();
     rl.SetConfigFlags(rl.FLAG_MSAA_4X_HINT);
     defer rl.CloseWindow();
+
+    var pcg = try PCGManager.init(allocator);
+    try pcg.generate(.{ .room = .{ .generate = .{} } });
+    try pcg.generate(.{ .room = .{ .generate = .{} } });
+    try pcg.generate(.{ .room = .{ .generate = .{} } });
+    try pcg.generate(.{ .room = .{ .generate = .{} } });
+    try pcg.generate(.{ .room = .{ .generate = .{} } });
+    try pcg.generate(.{ .architecture = .{ .generate = .{
+        .diameter = 10,
+        .max_corridor_length = 5,
+        .branch_chance = 0.25,
+        .min_branch_diameter = 2,
+        .max_branch_diameter = 5,
+        .change_direction_chance = 0.25,
+    } } });
+    const level = try pcg.retrieve_level();
+    defer level.deinit();
+    for (0..level.height) |y| {
+        for (0..level.width) |x| {
+            std.debug.print("{c}", .{level.get(x,y).toChar()});
+        }
+        std.debug.print("\n", .{});
+    }
 
     var world = try World.init(allocator);
 

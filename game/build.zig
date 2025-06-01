@@ -10,6 +10,10 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const pcgmanager = b.dependency("pcgmanager", .{});
+    exe_mod.addImport("pcgmanager", pcgmanager.module("root"));
+    exe_mod.linkLibrary(pcgmanager.artifact("pcgmanager"));
+
     const ray = b.dependency("raylib", .{});
     exe_mod.linkLibrary(ray.artifact("raylib"));
 
