@@ -6,7 +6,7 @@ pub const Direction = enum {
     down,
     left,
 
-    fn inverse(self: Direction) Direction {
+    pub fn inverse(self: Direction) Direction {
         return switch (self) {
             .up => .down,
             .down => .up,
@@ -20,11 +20,11 @@ pub const Position = struct {
     x: i32,
     y: i32,
 
-    fn init(x: i32, y: i32) Position {
+    pub fn init(x: i32, y: i32) Position {
         return .{ .x = x, .y = y };
     }
 
-    fn move(self: Position, dir: Direction) Position {
+    pub fn move(self: Position, dir: Direction) Position {
         switch (dir) {
             .up => return .{ .x = self.x, .y = self.y - 1 },
             .down => return .{ .x = self.x, .y = self.y + 1 },
@@ -43,6 +43,7 @@ pub const Tile = enum {
     ocean,
     wall,
     door,
+    entrance,
     size,
 
     const chars = std.EnumMap(Tile, u8).init(.{
@@ -52,17 +53,17 @@ pub const Tile = enum {
         .mountain = '^',
         .sand = '/',
         .trees = 'T',
-        .wall = '█',
-        .door = '󰠚',
+        .wall = '#',
+        .door = 'd',
         .entrance = '@',
         .size = 'X',
     });
 
-    fn toChar(tile: Tile) u8 {
+    pub fn toChar(tile: Tile) u8 {
         return chars.get(tile).?;
     }
 
-    fn fromChar(char: u8) Tile {
+    pub fn fromChar(char: u8) Tile {
         for (0..@intFromEnum(Tile.size) + 1) |i| {
             const tile: Tile = @enumFromInt(i);
             if (tile.toChar() == char) {
@@ -83,4 +84,30 @@ pub const Node = struct {
 
 pub const Architecture = std.ArrayList(Node);
 
-pub const Level = [][]Tile;
+const Tilemap = struct {
+    data: []Tile,
+    width: usize,
+    height: usize,
+    gpa: std.mem.Allocator,
+
+    pub fn init(alloc: std.mem.Allocator, width: usize, height: usize) !Tilemap {
+        const self = Tilemap{
+            .data = try alloc.alloc(Tile, width * height),
+            .width = width,
+            .height = height,
+            .gpa = alloc,
+        };
+        for (self.data) |*v| v.* = .empty;
+        return self;
+    }
+
+    pub fn deinit(self: Tilemap) void {
+        self.gpa.free(self.data);
+    }
+
+    pub fn get(self: Tilemap, x: usize, y: usize) *Tile {
+        return &self.data[(y * self.width) + x];
+    }
+};
+
+pub const Level = Tilemap;

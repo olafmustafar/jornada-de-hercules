@@ -66,14 +66,9 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
     while (expand_queue.items.len > 0) {
         const expand = expand_queue.pop().?;
         if (expand.diameter_left == 0) {
-            std.debug.print("branch over \n", .{});
             continue;
         }
 
-        if (expand.is_branch) {
-            std.debug.print("is branch, ", .{});
-        }
-        std.debug.print("{}: \n", .{count});
         count += 1;
         print_arch(&architecture);
 
@@ -186,17 +181,5 @@ fn print_arch(arch: *Architecture) void {
             board[@intCast(node.pos.y + 10)][@intCast(node.pos.x + 10)] = 1;
         }
     }
-    for (board) |line| {
-        for (line) |b| {
-            switch (b) {
-                0 => std.debug.print("..", .{}),
-                1 => std.debug.print("[]", .{}),
-                2 => std.debug.print("{{}}", .{}),
-                else => unreachable,
-            }
-        }
-        std.debug.print("\n", .{});
-    }
-    std.Thread.sleep(std.time.ns_per_s * 0.25);
 }
 pub const ArchitectureGenerator = Generator(Instruction, Architecture, generate);

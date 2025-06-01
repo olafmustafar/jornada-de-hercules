@@ -11,7 +11,7 @@ const Self = @This();
 
 const ContentTag = enum {
     room,
-    arch,
+    architecture,
 };
 
 const Content = union(ContentTag) {
@@ -27,20 +27,21 @@ pub fn init(alloc: std.mem.Allocator) Self {
     return .{ .rooms = .init(alloc), .architecture = null, .gpa = alloc };
 }
 
-pub fn add(self: *Self, content: Content) void {
-    switch (content) {
+pub fn add(self: *Self, content: Content) !void {
+    try switch (content) {
         .architecture => |arch| self.architecture = arch,
         .room => |room| self.rooms.append(room),
-    }
+    };
 }
 
-pub fn combine(self: *Self) Level {
-    std.debug.assert(self.architecture);
+pub fn combine(self: *Self) !Level {
+    std.debug.assert(self.architecture != null);
     std.debug.assert(self.rooms.items.len > 0);
+    const architecture = &self.architecture.?;
 
     var arch_min_pos = Pos.init(100, 100);
     var arch_max_pos = Pos.init(-100, -100);
-    for (self.architecture) |node| {
+    for (architecture.items) |node| {
         arch_min_pos.x = @min(arch_min_pos.x, node.pos.x);
         arch_min_pos.y = @min(arch_min_pos.y, node.pos.y);
         arch_max_pos.x = @max(arch_max_pos.x, node.pos.x);
@@ -48,40 +49,44 @@ pub fn combine(self: *Self) Level {
     }
 
     const room_w = @typeInfo(@typeInfo(Room).array.child).array.len;
-    const size_w = ((arch_max_pos.x - arch_min_pos.x) * (room_w + 1)) + 1;
+    const size_w = ((arch_max_pos.x - arch_min_pos.x + 1) * (room_w + 1)) + 1;
 
     const room_h = @typeInfo(Room).array.len;
-    const size_h = ((arch_max_pos.y - arch_min_pos.y) * (room_h + 1)) + 1;
+    const size_h = ((arch_max_pos.y - arch_min_pos.y + 1) * (room_h + 1)) + 1;
 
-    var level: Level = self.gpa.alloc([size_w]Tile, size_h);
+    const x_shift = -arch_min_pos.x;
+    const y_shift = -arch_min_pos.y;
 
-    var room_idx : usize = 0;
-    for (self.architecture) |node| {
-        const x = (arch_min_pos.x + node.pos.x) * (room_w + 1);
-        const y = (arch_min_pos.y + node.pos.y) * (room_h + 1);
+    var level = try Level.init(self.gpa, @intCast(size_w), @intCast(size_h));
+
+    var room_idx: usize = 0;
+    for (architecture.items) |node| {
+        const x: usize = @intCast((x_shift + node.pos.x) * (room_w + 1));
+        const y: usize = @intCast((y_shift + node.pos.y) * (room_h + 1));
 
         for (0..(room_w + 2)) |i| {
-            const tile: Tile = if (tile_is_central(i, room_w)) .door else .wall;
-            level[y][x + i] = tile;
-            level[y + room_h + 2][x + i] = tile;
+            const is_central = tile_is_central(i, room_w);
+            level.get(x + i, y).* = if (is_central and node.directions.get(.up)) .door else .wall;
+            level.get(x + i, y + room_h + 1).* = if (is_central and node.directions.get(.down)) .door else .wall;
         }
 
         for (0..(room_h + 2)) |i| {
-            const tile: Tile = if (tile_is_central(i, room_w)) .door else .wall;
-            level[y + i][x] = tile;
-            level[y + i][x + room_w + 2] = tile;
+            const is_central = tile_is_central(i, room_h);
+            level.get(x, y + i).* = if (is_central and node.directions.get(.left)) .door else .wall;
+            level.get(x + room_w + 1, y + i).* = if (is_central and node.directions.get(.right)) .door else .wall;
         }
 
         const room = self.rooms.items[room_idx];
-        for(0..room.len) |rx| {
-            for(0..room[x]) |ry| {
-                level[y+ry][x+rx];
+        for (0..room.len) |ry| {
+            for (0..room[ry].len) |rx| {
+                level.get(x + rx + 1, y + ry + 1).* = room[ry][rx];
             }
         }
 
-
-        room_idx = ( room_idx + 1 ) % self.rooms.items.len;
+        room_idx = (room_idx + 1) % self.rooms.items.len;
     }
+
+    return level;
 }
 
 fn tile_is_central(pos: usize, len: usize) bool {

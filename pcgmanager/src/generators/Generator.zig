@@ -1,5 +1,5 @@
 const std = @import("std");
-const Context = @import("Context.zig");
+const Context = @import("../Context.zig");
 
 pub fn Generator(
     comptime InstructionType: type,
