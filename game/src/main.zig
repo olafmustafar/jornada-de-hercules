@@ -85,7 +85,7 @@ const World = struct {
         self.player_current_animation = self.player_idle_animation;
         self.player_animation_counter = 0;
         self.player_position = vec2(0, 0);
-        self.player_radius = 1.0;
+        self.player_radius = 0.1;
         self.player_angle = 0.00;
         self.player_speed = 3.00;
 
@@ -145,6 +145,40 @@ const World = struct {
         }
         if ((rl.Vector2Equals(movement, rl.Vector2Zero())) == 0) {
             movement = rl.Vector2Normalize(movement);
+
+            for (self.collidable_tiles.items) |pos| {
+                const rec = rl.Rectangle{ .x = pos.x - 0.5, .y = pos.y - 0.5, .width = 1, .height = 1 };
+                if (rl.CheckCollisionCircleRec(self.player_position, self.player_radius, rec)) {
+                    if (movement.y > 0 and
+                        (self.player_position.y - self.player_radius < rec.y) and
+                        (self.player_position.y + self.player_radius > rec.y))
+                    {
+                        movement.y = 0;
+                    }
+
+                    if (movement.y < 0 and
+                        (self.player_position.y - self.player_radius < rec.y + rec.height) and
+                        (self.player_position.y + self.player_radius > rec.y + rec.height))
+                    {
+                        movement.y = 0;
+                    }
+
+                    if (movement.x > 0 and
+                        (self.player_position.x - self.player_radius < rec.x) and
+                        (self.player_position.x + self.player_radius > rec.x))
+                    {
+                        movement.x = 0;
+                    }
+
+                    if (movement.x < 0 and
+                        (self.player_position.x - self.player_radius < rec.x + rec.width) and
+                        (self.player_position.x + self.player_radius > rec.x + rec.width))
+                    {
+                        movement.x = 0;
+                    }
+                }
+            }
+
             self.player_position = rl.Vector2Add(self.player_position, rl.Vector2Scale(movement, delta * self.player_speed));
             self.player_current_animation = self.player_sprint_animation;
             self.player_angle = rl.Vector2Angle(vec2(0, 1), movement) * -rl.RAD2DEG;
@@ -154,29 +188,13 @@ const World = struct {
         self.player_animation_counter += 1;
         rl.UpdateModelAnimation(self.player_model, self.player_current_animation, self.player_animation_counter);
         if (self.player_animation_counter >= self.player_current_animation.frameCount) self.player_animation_counter = 0;
-
-        collision = null;
-        for (self.collidable_tiles.items) |pos| {
-            const rec = rl.Rectangle{ .x = pos.x, .y = pos.y, .width = 0.8, .height = 0.8 };
-            if (rl.CheckCollisionCircleRec(self.player_position, self.player_radius, rec)) {
-                std.debug.print("collision: px: {d}, py: {d}, recx: {d}, recy: {d}\n", .{ self.player_position.x, self.player_position.y, pos.x, pos.y });
-                collision = rec;
-            }
-        }
     }
-
-    var collision: ?rl.Rectangle = null;
 
     pub fn render(self: World) void {
         rl.BeginDrawing();
         rl.BeginMode3D(self.camera);
         {
             rl.ClearBackground(rl.DARKGRAY);
-
-            if (collision) |rec| {
-                rl.DrawCylinder(to_world_pos(self.player_position), self.player_radius, self.player_radius, 0.5, 10, rl.BLUE);
-                rl.DrawCube(to_world_pos(vec2(rec.x, rec.y)), rec.width, 50, rec.height, rl.RED);
-            }
 
             for (0..self.level.height) |y| {
                 for (0..self.level.width) |x| {
