@@ -23,7 +23,6 @@ pub const Instruction = union(InstructionTag) {
 
 const InstructionTag = enum { generate, place_manual };
 
-
 const Expand = struct {
     origin_idx: usize,
     is_branch: bool,
@@ -41,26 +40,36 @@ fn generate(ctx: *Context, instruction: Instruction) Architecture {
     }
 }
 
+fn reset_state(architecture: *Architecture, position_set: *std.AutoHashMap(Position, void), expand_queue: *std.ArrayList(Expand), diameter: usize) !void {
+    architecture.clearAndFree();
+    position_set.clearAndFree();
+    expand_queue.clearAndFree();
+
+    try architecture.append(Node{
+        .directions = .initDefault(false, .{}),
+        .entrance = .down,
+        .pos = .init(0, 0),
+        .is_branch = false,
+    });
+    try position_set.put(architecture.getLast().pos, {});
+    try expand_queue.append(Expand{
+        .is_branch = false,
+        .origin_idx = architecture.items.len - 1,
+        .diameter_left = diameter - 1,
+        .direction = .right,
+        .corridor_count = 0,
+    });
+}
+
 fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
     const rnd = ctx.random.random();
 
     var position_set = std.AutoHashMap(Position, void).init(ctx.gpa);
     defer position_set.deinit();
-
-    //initial node
     var architecture = Architecture.init(ctx.gpa);
-    try architecture.append(Node{ .directions = .initDefault(false, .{}), .pos = .{ .x = 0, .y = 0 }, .is_branch = false });
-    try position_set.put(architecture.getLast().pos, {});
-
-    //begin expanding from initial
     var expand_queue = std.ArrayList(Expand).init(ctx.gpa);
-    try expand_queue.append(Expand{
-        .is_branch = false,
-        .origin_idx = architecture.items.len - 1,
-        .diameter_left = args.diameter - 1,
-        .direction = .right,
-        .corridor_count = 0,
-    });
+
+    try reset_state(&architecture, &position_set, &expand_queue, args.diameter);
 
     var count: i32 = 0;
     while (expand_queue.items.len > 0) {
@@ -92,18 +101,7 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
             if (!expand.is_branch) {
                 //try again
                 count = 0;
-                position_set.clearAndFree();
-                architecture.clearAndFree();
-                try architecture.append(Node{ .directions = .initDefault(false, .{}), .pos = .{ .x = 0, .y = 0 }, .is_branch = false });
-                try position_set.put(architecture.getLast().pos, {});
-                expand_queue.clearAndFree();
-                try expand_queue.insert(0, Expand{
-                    .is_branch = false,
-                    .origin_idx = architecture.items.len - 1,
-                    .diameter_left = args.diameter,
-                    .direction = .right,
-                    .corridor_count = 0,
-                });
+                try reset_state(&architecture, &position_set, &expand_queue, args.diameter);
             }
             continue;
         }
@@ -113,6 +111,7 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
         var new_node = Node{
             .pos = origin.pos.move(dir),
             .directions = .initDefault(false, .{}),
+            .entrance = null,
             .is_branch = expand.is_branch,
         };
         new_node.directions.set(dir.inverse(), true);

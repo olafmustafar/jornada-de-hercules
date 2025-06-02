@@ -4,6 +4,7 @@ const Room = contents.Room;
 const Architecture = contents.Architecture;
 const Level = contents.Level;
 const Pos = contents.Position;
+const Direction = contents.Direction;
 const Tile = contents.Tile;
 const Node = contents.Node;
 
@@ -65,16 +66,47 @@ pub fn combine(self: *Self) !Level {
         const y: usize = @intCast((y_shift + node.pos.y) * (room_h + 1));
 
         for (0..(room_w + 2)) |i| {
-            const is_central = tile_is_central(i, room_w);
-            level.get(x + i, y).* = if (is_central and node.directions.get(.up)) .door else .wall;
-            level.get(x + i, y + room_h + 1).* = if (is_central and node.directions.get(.down)) .door else .wall;
+            const up = level.get(x + i, y);
+            const down = level.get(x + i, y + room_h + 1);
+            if (tile_is_central(i, room_w)) {
+                if (node.directions.get(.up)) {
+                    up.* = if (node.entrance == Direction.up) .entrance else .door;
+                } else {
+                    up.* = .wall;
+                }
+                if (node.directions.get(.down)) {
+                    down.* = if (node.entrance == Direction.down) .entrance else .door;
+                } else {
+                    down.* = .wall;
+                }
+            } else {
+                up.* = .wall;
+                down.* = .wall;
+            }
         }
 
         for (0..(room_h + 2)) |i| {
-            const is_central = tile_is_central(i, room_h);
-            level.get(x, y + i).* = if (is_central and node.directions.get(.left)) .door else .wall;
-            level.get(x + room_w + 1, y + i).* = if (is_central and node.directions.get(.right)) .door else .wall;
+            const left = level.get(x, y + i);
+            const right = level.get(x + room_w + 1, y + i);
+            if (tile_is_central(i, room_h)) {
+                if (node.directions.get(.left)) {
+                    left.* = if (node.entrance == Direction.left) .entrance else .door;
+                } else {
+                    left.* = .wall;
+                }
+
+                if (node.directions.get(.right)) {
+                    right.* = if (node.entrance == Direction.right) .entrance else .door;
+                } else {
+                    right.* = .wall;
+                }
+            } else {
+                left.* = .wall;
+                right.* = .wall;
+            }
         }
+
+        //add entrance
 
         const room = self.rooms.items[room_idx];
         for (0..room.len) |ry| {

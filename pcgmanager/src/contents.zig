@@ -80,6 +80,7 @@ pub const Node = struct {
     pos: Position,
     directions: std.EnumArray(Direction, bool),
     is_branch: bool,
+    entrance: ?Direction,
 };
 
 pub const Architecture = std.ArrayList(Node);

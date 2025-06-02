@@ -1,13 +1,13 @@
 const std = @import("std");
 const rl = @import("raylib.zig");
 const rll = @import("rlights.zig");
-const PCGManager = @import("pcgmanager").PCGManager;
+const PCGManager = @import("pcgmanager");
+
+const Tile = PCGManager.Contents.Tile;
+const Level = PCGManager.Contents.Level;
 
 const window_w = 800;
 const window_h = 600;
-
-const Tile = enum { plane, mountain, sand, trees, ocean, count };
-const Tilemap = [100][100]Tile;
 
 pub fn vec3(x: f32, y: f32, z: f32) rl.Vector3 {
     return rl.Vector3{ .x = x, .y = y, .z = z };
@@ -18,10 +18,10 @@ pub fn vec2(x: f32, y: f32) rl.Vector2 {
 }
 
 const World = struct {
-    tilemap: Tilemap,
+    level: Level,
     models: std.ArrayList(rl.Model),
     models_animations: std.ArrayList(*rl.ModelAnimation),
-    tile_models: [@intFromEnum(Tile.count)]rl.Model,
+    tile_models: std.EnumArray(Tile, ?rl.Model),
     shader: rl.Shader,
     light: rll.Light,
     camera: rl.Camera3D,
@@ -35,8 +35,9 @@ const World = struct {
     player_idle_animation: rl.ModelAnimation,
     player_animation_counter: i32,
 
-    pub fn init(allocator: std.mem.Allocator) !World {
+    pub fn init(allocator: std.mem.Allocator, level: Level) !World {
         var self: World = undefined;
+        self.level = level;
         self.models = std.ArrayList(rl.Model).init(allocator);
         self.models_animations = std.ArrayList(*rl.ModelAnimation).init(allocator);
 
@@ -54,16 +55,24 @@ const World = struct {
         const ambientLoc = rl.GetShaderLocation(self.shader, "ambient");
         rl.SetShaderValue(self.shader, ambientLoc, &[4]f32{ 2.0, 2.0, 2.0, 10.0 }, rl.SHADER_UNIFORM_VEC4);
 
-        self.tile_models = [_]rl.Model{
-            rl.LoadModel("assets/mountain_sqr.glb"),
-            rl.LoadModel("assets/ocean_sqr.glb"),
-            rl.LoadModel("assets/plane_sqrt.glb"),
-            rl.LoadModel("assets/sand_sqr.glb"),
-            rl.LoadModel("assets/trees_srq.glb"),
-        };
+        self.tile_models = .init(.{
+            .empty = null,
+            .plane = rl.LoadModel("assets/plane_sqrt.glb"),
+            .mountain = rl.LoadModel("assets/mountain_sqr.glb"),
+            .sand = rl.LoadModel("assets/sand_sqr.glb"),
+            .trees = rl.LoadModel("assets/trees_srq.glb"),
+            .ocean = rl.LoadModel("assets/ocean_sqr.glb"),
+            .wall = rl.LoadModel("assets/wall_sqr.glb"),
+            .door = null,
+            .entrance = null,
+            .size = null,
+        });
 
-        for (self.tile_models) |model|
-            try self.models.append(model);
+        for (self.tile_models.values) |model_opt| {
+            if (model_opt) |model| {
+                try self.models.append(model);
+            }
+        }
 
         self.player_model = rl.LoadModel("assets/player2.glb");
         try self.models.append(self.player_model);
@@ -75,15 +84,7 @@ const World = struct {
         self.player_animation_counter = 0;
         self.player_position = vec2(0, 0);
         self.player_angle = 0.00;
-        self.player_speed = 2.00;
-
-        for (0..animation_count) |i| std.debug.print("{}: {s}\n", .{ i, player_animations[i].name });
-
-        for (&self.tilemap) |*row| {
-            for (row) |*tile| {
-                tile.* = @enumFromInt(rl.GetRandomValue(0, self.tile_models.len - 1));
-            }
-        }
+        self.player_speed = 3.00;
 
         for (self.models.items) |model|
             model.materials[1].shader = self.shader;
@@ -130,8 +131,8 @@ const World = struct {
             movement = rl.Vector2Normalize(movement);
             self.player_position = rl.Vector2Add(self.player_position, rl.Vector2Scale(movement, delta * self.player_speed));
             self.player_current_animation = self.player_sprint_animation;
-            self.player_angle = rl.Vector2Angle(vec2(0,1), movement) * -rl.RAD2DEG ;
-        }else{
+            self.player_angle = rl.Vector2Angle(vec2(0, 1), movement) * -rl.RAD2DEG;
+        } else {
             self.player_current_animation = self.player_idle_animation;
         }
         self.player_animation_counter += 1;
@@ -144,16 +145,20 @@ const World = struct {
         rl.BeginMode3D(self.camera);
         {
             rl.ClearBackground(rl.DARKGRAY);
-
-            for (self.tilemap, 0..) |row, i|
-                for (row, 0..) |tile, j|
-                    rl.DrawModel(
-                        self.tile_models[@intFromEnum(tile)],
-                        World.to_world_pos(vec2(@floatFromInt(i), @floatFromInt(j))),
-                        1.0,
-                        rl.WHITE,
-                    );
-            rl.DrawModelEx(self.player_model , to_world_pos(self.player_position), vec3(0,1,0), self.player_angle, rl.Vector3Scale(rl.Vector3One(), 0.5), rl.WHITE);
+            for (0..self.level.height) |y| {
+                for (0..self.level.width) |x| {
+                    const tile = self.level.get(x, y).*;
+                    if (self.tile_models.get(tile)) |model| {
+                        rl.DrawModel(
+                            model,
+                            World.to_world_pos(vec2(@floatFromInt(x), @floatFromInt(y))),
+                            1.0,
+                            rl.WHITE,
+                        );
+                    }
+                }
+            }
+            rl.DrawModelEx(self.player_model, to_world_pos(self.player_position), vec3(0, 1, 0), self.player_angle, rl.Vector3Scale(rl.Vector3One(), 0.5), rl.WHITE);
             rl.DrawSphere(self.camera.target, 0.05, rl.RED);
             rl.DrawSphere(self.light.position, 0.15, rl.YELLOW);
             rl.DrawGrid(25, 1.0);
@@ -192,14 +197,8 @@ pub fn main() !void {
     } } });
     const level = try pcg.retrieve_level();
     defer level.deinit();
-    for (0..level.height) |y| {
-        for (0..level.width) |x| {
-            std.debug.print("{c}", .{level.get(x,y).toChar()});
-        }
-        std.debug.print("\n", .{});
-    }
 
-    var world = try World.init(allocator);
+    var world = try World.init(allocator, level);
 
     while (!rl.WindowShouldClose()) {
         world.update();
