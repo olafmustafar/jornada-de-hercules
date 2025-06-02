@@ -46,7 +46,7 @@ fn reset_state(architecture: *Architecture, position_set: *std.AutoHashMap(Posit
     expand_queue.clearAndFree();
 
     try architecture.append(Node{
-        .directions = .initDefault(false, .{}),
+        .directions = .initDefault(false, .{ .down = true }),
         .entrance = .down,
         .pos = .init(0, 0),
         .is_branch = false,
@@ -56,7 +56,7 @@ fn reset_state(architecture: *Architecture, position_set: *std.AutoHashMap(Posit
         .is_branch = false,
         .origin_idx = architecture.items.len - 1,
         .diameter_left = diameter - 1,
-        .direction = .right,
+        .direction = .up,
         .corridor_count = 0,
     });
 }

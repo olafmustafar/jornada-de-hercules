@@ -69,7 +69,7 @@ fn get_random_room(rnd: std.Random) Room {
     var row: usize = 0;
     while (it.next()) |line| {
         for (line[0..12], 0..) |char, col| {
-            room[row][col] = Tile.fromChar(char);
+            room[row][col] = Tile.from_char(char);
         }
         row += 1;
     }

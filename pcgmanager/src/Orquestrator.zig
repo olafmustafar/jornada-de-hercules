@@ -70,12 +70,12 @@ pub fn combine(self: *Self) !Level {
             const down = level.get(x + i, y + room_h + 1);
             if (tile_is_central(i, room_w)) {
                 if (node.directions.get(.up)) {
-                    up.* = if (node.entrance == Direction.up) .entrance else .door;
+                    up.* = if (node.entrance == .up) .entrance else .door;
                 } else {
                     up.* = .wall;
                 }
                 if (node.directions.get(.down)) {
-                    down.* = if (node.entrance == Direction.down) .entrance else .door;
+                    down.* = if (node.entrance == .down) .entrance else .door;
                 } else {
                     down.* = .wall;
                 }
@@ -90,13 +90,13 @@ pub fn combine(self: *Self) !Level {
             const right = level.get(x + room_w + 1, y + i);
             if (tile_is_central(i, room_h)) {
                 if (node.directions.get(.left)) {
-                    left.* = if (node.entrance == Direction.left) .entrance else .door;
+                    left.* = if (node.entrance == .left) .entrance else .door;
                 } else {
                     left.* = .wall;
                 }
 
                 if (node.directions.get(.right)) {
-                    right.* = if (node.entrance == Direction.right) .entrance else .door;
+                    right.* = if (node.entrance == .right) .entrance else .door;
                 } else {
                     right.* = .wall;
                 }
@@ -105,8 +105,6 @@ pub fn combine(self: *Self) !Level {
                 right.* = .wall;
             }
         }
-
-        //add entrance
 
         const room = self.rooms.items[room_idx];
         for (0..room.len) |ry| {

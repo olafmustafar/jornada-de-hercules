@@ -1,5 +1,5 @@
 const std = @import("std");
-const PCGManager = @import("root.zig").PCGManager;
+const PCGManager = @import("root.zig");
 
 pub fn main() !void {
     const alloc = std.heap.page_allocator;
@@ -24,7 +24,7 @@ pub fn main() !void {
 
     for (0..level.height) |y| {
         for (0..level.width) |x| {
-            std.debug.print("{c}", .{level.get(x,y).toChar()});
+            std.debug.print("{c}", .{level.get(x,y).to_char()});
         }
         std.debug.print("\n", .{});
     }

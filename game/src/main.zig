@@ -25,8 +25,10 @@ const World = struct {
     shader: rl.Shader,
     light: rll.Light,
     camera: rl.Camera3D,
+    collidable_tiles: std.ArrayList(rl.Vector2),
 
     player_position: rl.Vector2,
+    player_radius: f32,
     player_angle: f32,
     player_speed: f32,
     player_model: rl.Model,
@@ -83,8 +85,22 @@ const World = struct {
         self.player_current_animation = self.player_idle_animation;
         self.player_animation_counter = 0;
         self.player_position = vec2(0, 0);
+        self.player_radius = 1.0;
         self.player_angle = 0.00;
         self.player_speed = 3.00;
+
+        self.collidable_tiles = .init(allocator);
+        for (0..self.level.height) |y| {
+            for (0..self.level.width) |x| {
+                const tile = self.level.get(x, y);
+                if (tile.is_collidable()) {
+                    try self.collidable_tiles.append(vec2(@floatFromInt(x), @floatFromInt(y)));
+                }
+                if (tile.* == .entrance) {
+                    self.player_position = vec2(@floatFromInt(x), @floatFromInt(y));
+                }
+            }
+        }
 
         for (self.models.items) |model|
             model.materials[1].shader = self.shader;
@@ -138,13 +154,30 @@ const World = struct {
         self.player_animation_counter += 1;
         rl.UpdateModelAnimation(self.player_model, self.player_current_animation, self.player_animation_counter);
         if (self.player_animation_counter >= self.player_current_animation.frameCount) self.player_animation_counter = 0;
+
+        collision = null;
+        for (self.collidable_tiles.items) |pos| {
+            const rec = rl.Rectangle{ .x = pos.x, .y = pos.y, .width = 0.8, .height = 0.8 };
+            if (rl.CheckCollisionCircleRec(self.player_position, self.player_radius, rec)) {
+                std.debug.print("collision: px: {d}, py: {d}, recx: {d}, recy: {d}\n", .{ self.player_position.x, self.player_position.y, pos.x, pos.y });
+                collision = rec;
+            }
+        }
     }
+
+    var collision: ?rl.Rectangle = null;
 
     pub fn render(self: World) void {
         rl.BeginDrawing();
         rl.BeginMode3D(self.camera);
         {
             rl.ClearBackground(rl.DARKGRAY);
+
+            if (collision) |rec| {
+                rl.DrawCylinder(to_world_pos(self.player_position), self.player_radius, self.player_radius, 0.5, 10, rl.BLUE);
+                rl.DrawCube(to_world_pos(vec2(rec.x, rec.y)), rec.width, 50, rec.height, rl.RED);
+            }
+
             for (0..self.level.height) |y| {
                 for (0..self.level.width) |x| {
                     const tile = self.level.get(x, y).*;

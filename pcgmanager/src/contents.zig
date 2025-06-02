@@ -59,18 +59,25 @@ pub const Tile = enum {
         .size = 'X',
     });
 
-    pub fn toChar(tile: Tile) u8 {
+    pub fn to_char(tile: Tile) u8 {
         return chars.get(tile).?;
     }
 
-    pub fn fromChar(char: u8) Tile {
+    pub fn from_char(char: u8) Tile {
         for (0..@intFromEnum(Tile.size) + 1) |i| {
             const tile: Tile = @enumFromInt(i);
-            if (tile.toChar() == char) {
+            if (tile.to_char() == char) {
                 return tile;
             }
         }
         return Tile.empty;
+    }
+
+    pub fn is_collidable(tile: Tile) bool {
+        return tile == .mountain or
+            tile == .trees or
+            tile == .ocean or
+            tile == .wall;
     }
 };
 
