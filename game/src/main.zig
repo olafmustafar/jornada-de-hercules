@@ -145,41 +145,29 @@ const World = struct {
         }
         if ((rl.Vector2Equals(movement, rl.Vector2Zero())) == 0) {
             movement = rl.Vector2Normalize(movement);
+            var new_pos = rl.Vector2Add(self.player_position, rl.Vector2Scale(movement, delta * self.player_speed));
 
             for (self.collidable_tiles.items) |pos| {
                 const rec = rl.Rectangle{ .x = pos.x - 0.5, .y = pos.y - 0.5, .width = 1, .height = 1 };
-                if (rl.CheckCollisionCircleRec(self.player_position, self.player_radius, rec)) {
-                    if (movement.y > 0 and
-                        (self.player_position.y - self.player_radius < rec.y) and
-                        (self.player_position.y + self.player_radius > rec.y))
-                    {
-                        movement.y = 0;
-                    }
+                if (rl.CheckCollisionCircleRec(new_pos, self.player_radius, rec)) {
+                    const a = vec2(rec.x, rec.y); //upper coner
+                    const b = vec2(rec.x + rec.width, rec.y + rec.height); //lower corner
+                    const p = new_pos; //player
+                    const r = self.player_radius; //radius
 
-                    if (movement.y < 0 and
-                        (self.player_position.y - self.player_radius < rec.y + rec.height) and
-                        (self.player_position.y + self.player_radius > rec.y + rec.height))
-                    {
-                        movement.y = 0;
-                    }
-
-                    if (movement.x > 0 and
-                        (self.player_position.x - self.player_radius < rec.x) and
-                        (self.player_position.x + self.player_radius > rec.x))
-                    {
-                        movement.x = 0;
-                    }
-
-                    if (movement.x < 0 and
-                        (self.player_position.x - self.player_radius < rec.x + rec.width) and
-                        (self.player_position.x + self.player_radius > rec.x + rec.width))
-                    {
-                        movement.x = 0;
+                    if (p.x < a.x and p.y > a.y and p.y < b.y) {
+                        new_pos.x = a.x - r;
+                    } else if (p.x > b.x and p.y > a.y and p.y < b.y) {
+                        new_pos.x = b.x + r;
+                    } else if (p.y < a.y and p.x > a.x and p.x < b.x) {
+                        new_pos.y = a.y - r;
+                    } else if (p.y > b.y and p.x > a.x and p.x < b.x) {
+                        new_pos.y = b.y + r;
                     }
                 }
             }
 
-            self.player_position = rl.Vector2Add(self.player_position, rl.Vector2Scale(movement, delta * self.player_speed));
+            self.player_position = new_pos;
             self.player_current_animation = self.player_sprint_animation;
             self.player_angle = rl.Vector2Angle(vec2(0, 1), movement) * -rl.RAD2DEG;
         } else {
@@ -191,6 +179,16 @@ const World = struct {
     }
 
     pub fn render(self: World) void {
+        // debug draw
+        // rl.BeginDrawing();
+        // defer rl.EndDrawing();
+        // rl.ClearBackground(rl.DARKGRAY);
+        // for (self.collidable_tiles.items) |pos| {
+        //     const rec = rl.Rectangle{ .x = 10 * (pos.x - 0.5), .y = 10 * (pos.y - 0.5), .width = 10, .height = 10 };
+        //     rl.DrawRectangleRec(rec, rl.RED);
+        // }
+        // rl.DrawCircleV(rl.Vector2Scale(self.player_position, 10), self.player_radius * 10, rl.WHITE);
+
         rl.BeginDrawing();
         rl.BeginMode3D(self.camera);
         {
