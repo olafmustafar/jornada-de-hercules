@@ -118,4 +118,20 @@ const Tilemap = struct {
     }
 };
 
-pub const Level = Tilemap;
+pub const Rect = struct { x: f32, y: f32, w: f32, h: f32 };
+
+pub const Level = struct {
+    pub fn init(alloc: std.mem.Allocator, width: usize, height: usize) !Level {
+        return .{
+            .tilemap = try .init(alloc, width, height),
+            .room_rects = .init(alloc),
+        };
+    }
+    pub fn deinit(self: Level) void {
+        self.tilemap.deinit();
+        self.room_rects.deinit();
+    }
+
+    tilemap: Tilemap,
+    room_rects: std.ArrayList(Rect),
+};

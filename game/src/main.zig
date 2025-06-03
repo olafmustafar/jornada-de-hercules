@@ -37,6 +37,8 @@ const World = struct {
     player_idle_animation: rl.ModelAnimation,
     player_animation_counter: i32,
 
+    curr_room_center: rl.Vector2,
+
     pub fn init(allocator: std.mem.Allocator, level: Level) !World {
         var self: World = undefined;
         self.level = level;
@@ -90,14 +92,15 @@ const World = struct {
         self.player_speed = 3.00;
 
         self.collidable_tiles = .init(allocator);
-        for (0..self.level.height) |y| {
-            for (0..self.level.width) |x| {
-                const tile = self.level.get(x, y);
+        for (0..self.level.tilemap.height) |y| {
+            for (0..self.level.tilemap.width) |x| {
+                const tile = self.level.tilemap.get(x, y);
                 if (tile.is_collidable()) {
                     try self.collidable_tiles.append(vec2(@floatFromInt(x), @floatFromInt(y)));
                 }
                 if (tile.* == .entrance) {
                     self.player_position = vec2(@floatFromInt(x), @floatFromInt(y));
+                    self.camera.target = to_world_pos(self.player_position);
                 }
             }
         }
@@ -116,8 +119,19 @@ const World = struct {
     }
 
     pub fn update(self: *World) void {
-        self.camera.target = to_world_pos(self.player_position);
-        self.camera.position = rl.Vector3Add(to_world_pos(self.player_position), vec3(0, 7, 1));
+        for (self.level.room_rects.items) |room_rec| {
+            const rlrec = rl.Rectangle{ .x = room_rec.x, .y = room_rec.y, .width = room_rec.w, .height = room_rec.h };
+            if (rl.CheckCollisionPointRec(self.player_position, rlrec)) {
+                self.curr_room_center = vec2(
+                    room_rec.x + (room_rec.w / 2) - 0.5,
+                    room_rec.y + (room_rec.h / 2) - 0.5,
+                );
+            }
+        }
+
+        const dist = rl.Vector3Distance(self.camera.target, to_world_pos(self.curr_room_center));
+        self.camera.target = rl.Vector3MoveTowards(self.camera.target, to_world_pos(self.curr_room_center), rl.logf(dist + 1.1) * 0.1);
+        self.camera.position = rl.Vector3Add(self.camera.target, vec3(0, 8, 0.5));
         rl.UpdateCamera(&self.camera, rl.CAMERA_CUSTOM);
         rl.SetShaderValue(
             self.shader,
@@ -125,9 +139,13 @@ const World = struct {
             &[3]f32{ self.camera.position.x, self.camera.position.y, self.camera.position.z },
             rl.SHADER_UNIFORM_VEC3,
         );
-
         self.light.position = rl.Vector3Add(self.camera.position, vec3(5, 5, 5));
         rll.UpdateLightValues(self.shader, self.light);
+
+        //freeze while not focusing on room center
+        if (rl.FloatEquals(dist , 0) == 0) {
+            return;
+        }
 
         const delta = rl.GetFrameTime();
         var movement = rl.Vector2Zero();
@@ -173,6 +191,7 @@ const World = struct {
         } else {
             self.player_current_animation = self.player_idle_animation;
         }
+
         self.player_animation_counter += 1;
         rl.UpdateModelAnimation(self.player_model, self.player_current_animation, self.player_animation_counter);
         if (self.player_animation_counter >= self.player_current_animation.frameCount) self.player_animation_counter = 0;
@@ -194,9 +213,9 @@ const World = struct {
         {
             rl.ClearBackground(rl.DARKGRAY);
 
-            for (0..self.level.height) |y| {
-                for (0..self.level.width) |x| {
-                    const tile = self.level.get(x, y).*;
+            for (0..self.level.tilemap.height) |y| {
+                for (0..self.level.tilemap.width) |x| {
+                    const tile = self.level.tilemap.get(x, y).*;
                     if (self.tile_models.get(tile)) |model| {
                         rl.DrawModel(
                             model,
@@ -208,9 +227,9 @@ const World = struct {
                 }
             }
             rl.DrawModelEx(self.player_model, to_world_pos(self.player_position), vec3(0, 1, 0), self.player_angle, rl.Vector3Scale(rl.Vector3One(), 0.5), rl.WHITE);
-            rl.DrawSphere(self.camera.target, 0.05, rl.RED);
+            // rl.DrawSphere(self.camera.target, 0.05, rl.RED);
             rl.DrawSphere(self.light.position, 0.15, rl.YELLOW);
-            rl.DrawGrid(25, 1.0);
+            // rl.DrawGrid(255, 0.9);
         }
         rl.EndMode3D();
         rl.EndDrawing();

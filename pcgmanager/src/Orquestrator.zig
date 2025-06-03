@@ -3,6 +3,7 @@ const contents = @import("contents.zig");
 const Room = contents.Room;
 const Architecture = contents.Architecture;
 const Level = contents.Level;
+const Tilemap = contents.Tilemap;
 const Pos = contents.Position;
 const Direction = contents.Direction;
 const Tile = contents.Tile;
@@ -65,9 +66,16 @@ pub fn combine(self: *Self) !Level {
         const x: usize = @intCast((x_shift + node.pos.x) * (room_w + 1));
         const y: usize = @intCast((y_shift + node.pos.y) * (room_h + 1));
 
+        try level.room_rects.append(.{
+            .x = @as(f32, @floatFromInt(x)) + 0.5,
+            .y = @as(f32, @floatFromInt(y)) + 0.5,
+            .w = room_w + 1,
+            .h = room_h + 1,
+        });
+
         for (0..(room_w + 2)) |i| {
-            const up = level.get(x + i, y);
-            const down = level.get(x + i, y + room_h + 1);
+            const up = level.tilemap.get(x + i, y);
+            const down = level.tilemap.get(x + i, y + room_h + 1);
             if (tile_is_central(i, room_w)) {
                 if (node.directions.get(.up)) {
                     up.* = if (node.entrance == .up) .entrance else .door;
@@ -86,8 +94,8 @@ pub fn combine(self: *Self) !Level {
         }
 
         for (0..(room_h + 2)) |i| {
-            const left = level.get(x, y + i);
-            const right = level.get(x + room_w + 1, y + i);
+            const left = level.tilemap.get(x, y + i);
+            const right = level.tilemap.get(x + room_w + 1, y + i);
             if (tile_is_central(i, room_h)) {
                 if (node.directions.get(.left)) {
                     left.* = if (node.entrance == .left) .entrance else .door;
@@ -109,7 +117,7 @@ pub fn combine(self: *Self) !Level {
         const room = self.rooms.items[room_idx];
         for (0..room.len) |ry| {
             for (0..room[ry].len) |rx| {
-                level.get(x + rx + 1, y + ry + 1).* = room[ry][rx];
+                level.tilemap.get(x + rx + 1, y + ry + 1).* = room[ry][rx];
             }
         }
 

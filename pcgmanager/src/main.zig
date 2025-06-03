@@ -22,9 +22,9 @@ pub fn main() !void {
     const level = try pcg.retrieve_level();
     defer level.deinit();
 
-    for (0..level.height) |y| {
-        for (0..level.width) |x| {
-            std.debug.print("{c}", .{level.get(x,y).to_char()});
+    for (0..level.tilemap.height) |y| {
+        for (0..level.tilemap.width) |x| {
+            std.debug.print("{c}", .{level.tilemap.get(x,y).to_char()});
         }
         std.debug.print("\n", .{});
     }
