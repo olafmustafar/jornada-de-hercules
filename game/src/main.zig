@@ -17,6 +17,20 @@ pub fn vec2(x: f32, y: f32) rl.Vector2 {
     return rl.Vector2{ .x = x, .y = y };
 }
 
+const EnemyStrategy = enum {
+    chase,
+};
+
+const Enemy = struct {
+    // model: rl.Model,
+    active: bool,
+    pos: rl.Vector2,
+    health_points: i32,
+    velocity: f32,
+    radius: f32,
+    strategy: EnemyStrategy,
+};
+
 const World = struct {
     level: Level,
     models: std.ArrayList(rl.Model),
@@ -26,6 +40,7 @@ const World = struct {
     light: rll.Light,
     camera: rl.Camera3D,
     collidable_tiles: std.ArrayList(rl.Vector2),
+    enemies: std.ArrayList(Enemy),
 
     player_position: rl.Vector2,
     player_radius: f32,
@@ -37,13 +52,13 @@ const World = struct {
     player_idle_animation: rl.ModelAnimation,
     player_animation_counter: i32,
 
-    curr_room_center: rl.Vector2,
+    curr_room: rl.Rectangle,
 
     pub fn init(allocator: std.mem.Allocator, level: Level) !World {
         var self: World = undefined;
         self.level = level;
         self.models = std.ArrayList(rl.Model).init(allocator);
-        self.models_animations = std.ArrayList(*rl.ModelAnimation).init(allocator);
+        self.models_animations = .init(allocator);
 
         self.camera = rl.Camera3D{
             .position = vec3(10.0, 5.0, 10.0),
@@ -105,6 +120,18 @@ const World = struct {
             }
         }
 
+        self.enemies = .init(allocator);
+        for (0..10) |i| {
+            try self.enemies.append(Enemy{
+                .active = true,
+                .health_points = 100,
+                .pos = rl.Vector2Add(self.player_position, vec2(5 * @as(f32, @floatFromInt(i)), 0)),
+                .velocity = 3.00,
+                .radius = 0.1,
+                .strategy = .chase,
+            });
+        }
+
         for (self.models.items) |model|
             model.materials[1].shader = self.shader;
 
@@ -116,21 +143,23 @@ const World = struct {
         for (self.models.items) |model| rl.UnloadModel(model);
         for (self.models_animations.items) |animations| rl.UnloadModelAnimations(animations);
         self.models.deinit();
+        self.enemies.deinit();
     }
 
     pub fn update(self: *World) void {
         for (self.level.room_rects.items) |room_rec| {
             const rlrec = rl.Rectangle{ .x = room_rec.x, .y = room_rec.y, .width = room_rec.w, .height = room_rec.h };
             if (rl.CheckCollisionPointRec(self.player_position, rlrec)) {
-                self.curr_room_center = vec2(
-                    room_rec.x + (room_rec.w / 2) - 0.5,
-                    room_rec.y + (room_rec.h / 2) - 0.5,
-                );
+                self.curr_room = rl.Rectangle{ .x = room_rec.x, .y = room_rec.y, .width = room_rec.w, .height = room_rec.h };
             }
         }
 
-        const dist = rl.Vector3Distance(self.camera.target, to_world_pos(self.curr_room_center));
-        self.camera.target = rl.Vector3MoveTowards(self.camera.target, to_world_pos(self.curr_room_center), rl.logf(dist + 1.1) * 0.1);
+        const center = vec2(
+            self.curr_room.x + (self.curr_room.width / 2) - 0.5,
+            self.curr_room.y + (self.curr_room.height / 2) - 0.5,
+        );
+        const dist = rl.Vector3Distance(self.camera.target, to_world_pos(center));
+        self.camera.target = rl.Vector3MoveTowards(self.camera.target, to_world_pos(center), rl.logf(dist + 1.1) * 0.1);
         self.camera.position = rl.Vector3Add(self.camera.target, vec3(0, 8, 0.5));
         rl.UpdateCamera(&self.camera, rl.CAMERA_CUSTOM);
         rl.SetShaderValue(
@@ -143,7 +172,7 @@ const World = struct {
         rll.UpdateLightValues(self.shader, self.light);
 
         //freeze while not focusing on room center
-        if (rl.FloatEquals(dist , 0) == 0) {
+        if (rl.FloatEquals(dist, 0) == 0) {
             return;
         }
 
@@ -195,6 +224,17 @@ const World = struct {
         self.player_animation_counter += 1;
         rl.UpdateModelAnimation(self.player_model, self.player_current_animation, self.player_animation_counter);
         if (self.player_animation_counter >= self.player_current_animation.frameCount) self.player_animation_counter = 0;
+
+        for (self.enemies.items) |*e| {
+            if (!rl.CheckCollisionPointRec(e.pos, self.curr_room))
+                continue;
+
+            switch (e.strategy) {
+                .chase => {
+                    e.pos = rl.Vector2MoveTowards(e.pos, self.player_position, e.velocity * delta);
+                },
+            }
+        }
     }
 
     pub fn render(self: World) void {
@@ -226,6 +266,11 @@ const World = struct {
                     }
                 }
             }
+
+            for (self.enemies.items) |e| {
+                rl.DrawCapsule(to_world_pos(e.pos), to_world_pos_y(e.pos, 1), e.radius, 10, 3, rl.RED);
+            }
+
             rl.DrawModelEx(self.player_model, to_world_pos(self.player_position), vec3(0, 1, 0), self.player_angle, rl.Vector3Scale(rl.Vector3One(), 0.5), rl.WHITE);
             // rl.DrawSphere(self.camera.target, 0.05, rl.RED);
             rl.DrawSphere(self.light.position, 0.15, rl.YELLOW);
@@ -233,6 +278,10 @@ const World = struct {
         }
         rl.EndMode3D();
         rl.EndDrawing();
+    }
+
+    fn to_world_pos_y(pos: rl.Vector2, y: f32) rl.Vector3 {
+        return vec3(pos.x * 0.90, y, pos.y * 0.90);
     }
 
     fn to_world_pos(pos: rl.Vector2) rl.Vector3 {

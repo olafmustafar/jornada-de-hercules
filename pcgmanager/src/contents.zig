@@ -118,6 +118,21 @@ const Tilemap = struct {
     }
 };
 
+const EnemyType = enum {
+    chaser,
+    shooter,
+    flyer,
+};
+
+const Enemy = struct {
+    health: i32,
+    damage: i32,
+    velocity: f32,
+    type: EnemyType,
+};
+
+const Enemies = std.ArrayList(Enemy);
+
 pub const Rect = struct { x: f32, y: f32, w: f32, h: f32 };
 
 pub const Level = struct {
