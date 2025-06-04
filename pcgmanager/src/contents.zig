@@ -81,7 +81,11 @@ pub const Tile = enum {
     }
 };
 
-pub const Room = [8][12]Tile;
+pub const Room = struct {
+    const EnemyPos = struct { Position, Enemy.Type };
+    tilemap: [8][12]Tile,
+    enemies: std.ArrayList(EnemyPos),
+};
 
 pub const Node = struct {
     pos: Position,

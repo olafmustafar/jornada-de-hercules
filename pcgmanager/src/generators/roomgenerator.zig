@@ -12,15 +12,18 @@ pub const Instruction = union(InstructionTag) {
     place_manual: Room,
 };
 
-const rooms = [_][]const u8{
-    \\............
+const rooms = [_]const struct { []const u8, []Room.EnemyPos }{
+    .{ \\............
     \\.##..##..##.
     \\.##..##..##.
     \\.....##.....
     \\.##......##.
     \\.##..##..##.
     \\.##..##..##.
-    \\............ 
+    \\............  
+        , 
+    { .{ .{.x = 0, .y = 0}, .chaser } }
+    }
     ,
     \\////////////
     \\//~~////~~//
