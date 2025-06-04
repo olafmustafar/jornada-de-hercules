@@ -118,20 +118,23 @@ const Tilemap = struct {
     }
 };
 
-const EnemyType = enum {
-    chaser,
-    shooter,
-    flyer,
-};
-
 const Enemy = struct {
+    const Type = enum {
+        slow_chaser,
+        fast_chaser,
+        still_shooter,
+        walking_shooter,
+        flyer,
+    };
+
+    type: Type,
     health: i32,
     damage: i32,
     velocity: f32,
-    type: EnemyType,
+    shooting_velocity: f32,
 };
 
-const Enemies = std.ArrayList(Enemy);
+const Enemies = std.ArrayList(std.ArrayList(Enemy));
 
 pub const Rect = struct { x: f32, y: f32, w: f32, h: f32 };
 
