@@ -7,13 +7,15 @@ const EnemiesPerDifficulty = @import("../contents.zig").EnemiesPerDifficulty;
 const InstructionTag = enum { generate };
 
 pub const Instruction = union(InstructionTag) {
-    generate: struct {},
+    generate: struct { dummy: i32 = 0 },
 };
 
 fn generate(ctx: *Context, instruction: Instruction) EnemiesPerDifficulty {
     switch (instruction) {
         .generate => |_| {
-            return get_random_enemies(std.Random, ctx.difficulty_classes);
+            return get_random_enemies(ctx, ctx.difficulty_classes) catch {
+                unreachable;
+            };
         },
     }
 }
@@ -24,7 +26,7 @@ fn get_random_enemies(ctx: *Context, classes: usize) !EnemiesPerDifficulty {
     for (0..classes) |i| {
         try enemies.append(.initUndefined());
 
-        const frac: f32 = (i + 1) / classes;
+        const frac: f32 = (@as(f32, @floatFromInt(i)) + 1) / @as(f32, @floatFromInt(classes));
         const multiplier = ease_in_out_quad(frac);
 
         const fast_chaser = Enemy{
@@ -67,18 +69,19 @@ fn get_random_enemies(ctx: *Context, classes: usize) !EnemiesPerDifficulty {
             .shooting_velocity = 0,
         };
 
-        enemies.getLast().set(.fast_chaser, fast_chaser);
-        enemies.getLast().set(.slow_chaser, slow_chaser);
-        enemies.getLast().set(.shooter, shooter);
-        enemies.getLast().set(.walking_shooter, walking_shooter);
-        enemies.getLast().set(.flyer, flyer);
+        const last = &enemies.items[enemies.items.len - 1];
+        last.set(.fast_chaser, fast_chaser);
+        last.set(.slow_chaser, slow_chaser);
+        last.set(.shooter, shooter);
+        last.set(.walking_shooter, walking_shooter);
+        last.set(.flyer, flyer);
     }
 
     return enemies;
 }
 
-pub const EnemiesGenerator = Generator(Instruction, EnemiesPerDifficulty, generate);
-
 fn ease_in_out_quad(x: f32) f32 {
-    return if (x < 0.5) 2 * x * x else 1 - (std.math.pow(-2 * x + 2, 2) / 2);
+    return if (x < 0.5) 2 * x * x else 1 - (std.math.pow(f32, -2 * x + 2, 2) / 2);
 }
+
+pub const EnemiesGenerator = Generator(Instruction, EnemiesPerDifficulty, generate);

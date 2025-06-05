@@ -58,7 +58,6 @@ pub fn combine(self: *Self) !Level {
         arch_max_pos.y = @max(arch_max_pos.y, node.pos.y);
     }
 
-    
     const room_w = @typeInfo(@typeInfo(@FieldType(Room, "tilemap")).array.child).array.len;
     const size_w = ((arch_max_pos.x - arch_min_pos.x + 1) * (room_w + 1)) + 1;
 
@@ -133,7 +132,10 @@ pub fn combine(self: *Self) !Level {
         for (room.enemies.items) |placeholder| {
             const enemies = &enemies_per_difficulty.items[node.difficulty_class];
             try level.enemies.append(.{
-                .pos = placeholder.pos,
+                .pos = .{
+                    .x = placeholder.pos.x + @as(i32, @intCast(x)) + 1,
+                    .y = placeholder.pos.y + @as(i32, @intCast(y)) + 1,
+                },
                 .enemy = enemies.get(placeholder.type),
             });
         }

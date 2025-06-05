@@ -10,6 +10,7 @@ pub fn main() !void {
     try pcg.generate(.{ .room = .{ .generate = .{} } });
     try pcg.generate(.{ .room = .{ .generate = .{} } });
     try pcg.generate(.{ .room = .{ .generate = .{} } });
+    try pcg.generate(.{ .enemies = .{ .generate = .{} } });
     try pcg.generate(.{ .architecture = .{ .generate = .{
         .diameter = 10,
         .max_corridor_length = 5,
@@ -24,7 +25,19 @@ pub fn main() !void {
 
     for (0..level.tilemap.height) |y| {
         for (0..level.tilemap.width) |x| {
-            std.debug.print("{c}", .{level.tilemap.get(x,y).to_char()});
+            var is_enemy = false;
+            for (level.enemies.items) |en| {
+                if (en.pos.x == x and en.pos.y == y) {
+                    is_enemy = true;
+                    break;
+                }
+            }
+
+            if (is_enemy) {
+                std.debug.print("E", .{});
+            } else {
+                std.debug.print("{c}", .{level.tilemap.get(x, y).to_char()});
+            }
         }
         std.debug.print("\n", .{});
     }

@@ -133,8 +133,8 @@ pub const Enemy = struct {
     };
 
     type: Type,
-    health: i32,
-    damage: i32,
+    health: f32,
+    damage: f32,
     velocity: f32,
     shooting_velocity: f32,
 };

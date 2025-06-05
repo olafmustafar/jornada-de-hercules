@@ -2,8 +2,8 @@ const std = @import("std");
 
 const Self = @This();
 
-difficulty_level: usize = 5,
-difficulty_classes: usize = 10,
+difficulty_level: usize,
+difficulty_classes: usize,
 gpa: std.mem.Allocator,
 random: std.Random.DefaultPrng,
 
