@@ -5,6 +5,15 @@ const PCGManager = @import("pcgmanager");
 
 const Tile = PCGManager.Contents.Tile;
 const Level = PCGManager.Contents.Level;
+const Enemy = PCGManager.Contents.Enemy;
+const EnemyInstance = struct {
+    // model: rl.Model,
+    enemy: Enemy,
+    active: bool,
+    pos: rl.Vector2,
+    health_points: f32,
+    radius: f32,
+};
 
 const window_w = 800;
 const window_h = 600;
@@ -17,20 +26,6 @@ pub fn vec2(x: f32, y: f32) rl.Vector2 {
     return rl.Vector2{ .x = x, .y = y };
 }
 
-const EnemyStrategy = enum {
-    chase,
-};
-
-const Enemy = struct {
-    // model: rl.Model,
-    active: bool,
-    pos: rl.Vector2,
-    health_points: i32,
-    velocity: f32,
-    radius: f32,
-    strategy: EnemyStrategy,
-};
-
 const World = struct {
     level: Level,
     models: std.ArrayList(rl.Model),
@@ -40,7 +35,7 @@ const World = struct {
     light: rll.Light,
     camera: rl.Camera3D,
     collidable_tiles: std.ArrayList(rl.Vector2),
-    enemies: std.ArrayList(Enemy),
+    enemies: std.ArrayList(EnemyInstance),
 
     player_position: rl.Vector2,
     player_radius: f32,
@@ -121,14 +116,14 @@ const World = struct {
         }
 
         self.enemies = .init(allocator);
-        for (0..10) |i| {
-            try self.enemies.append(Enemy{
+
+        for (self.level.enemies.items) |e| {
+            try self.enemies.append(EnemyInstance{
+                .enemy = e.enemy,
                 .active = true,
-                .health_points = 100,
-                .pos = rl.Vector2Add(self.player_position, vec2(5 * @as(f32, @floatFromInt(i)), 0)),
-                .velocity = 3.00,
+                .health_points = e.enemy.health,
+                .pos = vec2(@floatFromInt(e.pos.x), @floatFromInt(e.pos.y)),
                 .radius = 0.1,
-                .strategy = .chase,
             });
         }
 
@@ -229,11 +224,7 @@ const World = struct {
             if (!rl.CheckCollisionPointRec(e.pos, self.curr_room))
                 continue;
 
-            switch (e.strategy) {
-                .chase => {
-                    e.pos = rl.Vector2MoveTowards(e.pos, self.player_position, e.velocity * delta);
-                },
-            }
+            e.pos = rl.Vector2MoveTowards(e.pos, self.player_position, e.enemy.velocity * delta);
         }
     }
 
@@ -252,6 +243,7 @@ const World = struct {
         rl.BeginMode3D(self.camera);
         {
             rl.ClearBackground(rl.DARKGRAY);
+            rl.DrawRectangleLinesEx(self.curr_room, 1, rl.RED);
 
             for (0..self.level.tilemap.height) |y| {
                 for (0..self.level.tilemap.width) |x| {
@@ -272,9 +264,8 @@ const World = struct {
             }
 
             rl.DrawModelEx(self.player_model, to_world_pos(self.player_position), vec3(0, 1, 0), self.player_angle, rl.Vector3Scale(rl.Vector3One(), 0.5), rl.WHITE);
-            // rl.DrawSphere(self.camera.target, 0.05, rl.RED);
             rl.DrawSphere(self.light.position, 0.15, rl.YELLOW);
-            // rl.DrawGrid(255, 0.9);
+            rl.DrawGrid(255, 0.9);
         }
         rl.EndMode3D();
         rl.EndDrawing();
