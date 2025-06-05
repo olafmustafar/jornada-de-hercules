@@ -40,7 +40,7 @@ fn generate(ctx: *Context, instruction: Instruction) Architecture {
     }
 }
 
-fn reset_state(architecture: *Architecture, position_set: *std.AutoHashMap(Position, void), expand_queue: *std.ArrayList(Expand), diameter: usize) !void {
+fn reset_state(ctx: *Context, architecture: *Architecture, position_set: *std.AutoHashMap(Position, void), expand_queue: *std.ArrayList(Expand), diameter: usize) !void {
     architecture.clearAndFree();
     position_set.clearAndFree();
     expand_queue.clearAndFree();
@@ -50,6 +50,7 @@ fn reset_state(architecture: *Architecture, position_set: *std.AutoHashMap(Posit
         .entrance = .down,
         .pos = .init(0, 0),
         .is_branch = false,
+        .difficulty_class = ctx.difficulty_level - 1,
     });
     try position_set.put(architecture.getLast().pos, {});
     try expand_queue.append(Expand{
@@ -69,7 +70,7 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
     var architecture = Architecture.init(ctx.gpa);
     var expand_queue = std.ArrayList(Expand).init(ctx.gpa);
 
-    try reset_state(&architecture, &position_set, &expand_queue, args.diameter);
+    try reset_state(ctx, &architecture, &position_set, &expand_queue, args.diameter);
 
     var count: i32 = 0;
     while (expand_queue.items.len > 0) {
@@ -101,7 +102,7 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
             if (!expand.is_branch) {
                 //try again
                 count = 0;
-                try reset_state(&architecture, &position_set, &expand_queue, args.diameter);
+                try reset_state(ctx, &architecture, &position_set, &expand_queue, args.diameter);
             }
             continue;
         }
@@ -113,6 +114,12 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
             .directions = .initDefault(false, .{}),
             .entrance = null,
             .is_branch = expand.is_branch,
+            .difficulty_class = if (@as(f32, @floatFromInt(expand.diameter_left)) > (@as(f32, @floatFromInt(args.diameter)) * 0.6))
+                ctx.difficulty_level - 1
+            else if (@as(f32, @floatFromInt(expand.diameter_left)) > (@as(f32, @floatFromInt(args.diameter)) * 0.2))
+                ctx.difficulty_level
+            else
+                ctx.difficulty_level + 1,
         };
         new_node.directions.set(dir.inverse(), true);
 

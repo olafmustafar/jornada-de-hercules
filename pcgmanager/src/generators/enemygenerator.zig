@@ -2,26 +2,28 @@ const std = @import("std");
 const Generator = @import("Generator.zig").Generator;
 const Context = @import("../Context.zig");
 const Enemy = @import("../contents.zig").Enemy;
-const Enemies = @import("../contents.zig").Enemies;
+const EnemiesPerDifficulty = @import("../contents.zig").EnemiesPerDifficulty;
 
 const InstructionTag = enum { generate };
 
 pub const Instruction = union(InstructionTag) {
-    generate: struct { classes_count: usize },
+    generate: struct {},
 };
 
-fn generate(ctx: *Context, instruction: Instruction) Enemies {
+fn generate(ctx: *Context, instruction: Instruction) EnemiesPerDifficulty {
     switch (instruction) {
-        .generate => |arg| {
-            return get_random_enemies(std.Random, arg.classes_count);
+        .generate => |_| {
+            return get_random_enemies(std.Random, ctx.difficulty_classes);
         },
     }
 }
 
-fn get_random_enemies(ctx: *Context, classes: usize) !Enemies {
-    var enemies: Enemies = .init(ctx.gpa);
+fn get_random_enemies(ctx: *Context, classes: usize) !EnemiesPerDifficulty {
+    var enemies: EnemiesPerDifficulty = .init(ctx.gpa);
 
     for (0..classes) |i| {
+        try enemies.append(.initUndefined());
+
         const frac: f32 = (i + 1) / classes;
         const multiplier = ease_in_out_quad(frac);
 
@@ -65,17 +67,17 @@ fn get_random_enemies(ctx: *Context, classes: usize) !Enemies {
             .shooting_velocity = 0,
         };
 
-        try enemies.append(fast_chaser);
-        try enemies.append(slow_chaser);
-        try enemies.append(shooter);
-        try enemies.append(walking_shooter);
-        try enemies.append(flyer);
+        enemies.getLast().set(.fast_chaser, fast_chaser);
+        enemies.getLast().set(.slow_chaser, slow_chaser);
+        enemies.getLast().set(.shooter, shooter);
+        enemies.getLast().set(.walking_shooter, walking_shooter);
+        enemies.getLast().set(.flyer, flyer);
     }
 
     return enemies;
 }
 
-pub const EnemiesGenerator = Generator(Instruction, Enemies, generate);
+pub const EnemiesGenerator = Generator(Instruction, EnemiesPerDifficulty, generate);
 
 fn ease_in_out_quad(x: f32) f32 {
     return if (x < 0.5) 2 * x * x else 1 - (std.math.pow(-2 * x + 2, 2) / 2);

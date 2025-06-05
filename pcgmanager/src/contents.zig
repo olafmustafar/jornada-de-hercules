@@ -82,9 +82,9 @@ pub const Tile = enum {
 };
 
 pub const Room = struct {
-    const EnemyPos = struct { Position, Enemy.Type };
+    pub const Placeholder = struct { pos: Position, type: Enemy.Type };
     tilemap: [8][12]Tile,
-    enemies: std.ArrayList(EnemyPos),
+    enemies: std.ArrayList(Placeholder),
 };
 
 pub const Node = struct {
@@ -92,6 +92,7 @@ pub const Node = struct {
     directions: std.EnumArray(Direction, bool),
     is_branch: bool,
     entrance: ?Direction,
+    difficulty_class: usize,
 };
 
 pub const Architecture = std.ArrayList(Node);
@@ -122,11 +123,11 @@ const Tilemap = struct {
     }
 };
 
-const Enemy = struct {
-    const Type = enum {
+pub const Enemy = struct {
+    pub const Type = enum {
         slow_chaser,
         fast_chaser,
-        still_shooter,
+        shooter,
         walking_shooter,
         flyer,
     };
@@ -138,22 +139,27 @@ const Enemy = struct {
     shooting_velocity: f32,
 };
 
-const Enemies = std.ArrayList(std.ArrayList(Enemy));
+pub const EnemiesPerDifficulty = std.ArrayList(std.EnumArray(Enemy.Type, Enemy));
 
 pub const Rect = struct { x: f32, y: f32, w: f32, h: f32 };
 
 pub const Level = struct {
+    pub const EnemyLocation = struct { pos: Position, enemy: Enemy };
+
     pub fn init(alloc: std.mem.Allocator, width: usize, height: usize) !Level {
         return .{
             .tilemap = try .init(alloc, width, height),
             .room_rects = .init(alloc),
+            .enemies = .init(alloc),
         };
     }
     pub fn deinit(self: Level) void {
         self.tilemap.deinit();
         self.room_rects.deinit();
+        self.enemies.deinit();
     }
 
     tilemap: Tilemap,
     room_rects: std.ArrayList(Rect),
+    enemies: std.ArrayList(EnemyLocation),
 };

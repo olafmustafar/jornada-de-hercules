@@ -8,37 +8,45 @@ const Pos = contents.Position;
 const Direction = contents.Direction;
 const Tile = contents.Tile;
 const Node = contents.Node;
+const EnemiesPerDifficulty = contents.EnemiesPerDifficulty;
 
 const Self = @This();
 
 const ContentTag = enum {
     room,
     architecture,
+    enemies_per_difficulty,
 };
 
 const Content = union(ContentTag) {
     room: Room,
     architecture: Architecture,
+    enemies_per_difficulty: EnemiesPerDifficulty,
 };
 
 rooms: std.ArrayList(Room),
+enemies_per_difficulty: ?EnemiesPerDifficulty,
 architecture: ?Architecture,
 gpa: std.mem.Allocator,
 
 pub fn init(alloc: std.mem.Allocator) Self {
-    return .{ .rooms = .init(alloc), .architecture = null, .gpa = alloc };
+    return .{ .rooms = .init(alloc), .architecture = null, .enemies_per_difficulty = null, .gpa = alloc };
 }
 
 pub fn add(self: *Self, content: Content) !void {
     try switch (content) {
         .architecture => |arch| self.architecture = arch,
         .room => |room| self.rooms.append(room),
+        .enemies_per_difficulty => |enemies_per_difficulty| self.enemies_per_difficulty = enemies_per_difficulty,
     };
 }
 
 pub fn combine(self: *Self) !Level {
-    std.debug.assert(self.architecture != null);
     std.debug.assert(self.rooms.items.len > 0);
+    std.debug.assert(self.enemies_per_difficulty != null);
+    std.debug.assert(self.architecture != null);
+
+    const enemies_per_difficulty = &self.enemies_per_difficulty.?;
     const architecture = &self.architecture.?;
 
     var arch_min_pos = Pos.init(100, 100);
@@ -50,10 +58,11 @@ pub fn combine(self: *Self) !Level {
         arch_max_pos.y = @max(arch_max_pos.y, node.pos.y);
     }
 
-    const room_w = @typeInfo(@typeInfo(Room).array.child).array.len;
+    
+    const room_w = @typeInfo(@typeInfo(@FieldType(Room, "tilemap")).array.child).array.len;
     const size_w = ((arch_max_pos.x - arch_min_pos.x + 1) * (room_w + 1)) + 1;
 
-    const room_h = @typeInfo(Room).array.len;
+    const room_h = @typeInfo(@FieldType(Room, "tilemap")).array.len;
     const size_h = ((arch_max_pos.y - arch_min_pos.y + 1) * (room_h + 1)) + 1;
 
     const x_shift = -arch_min_pos.x;
@@ -115,10 +124,18 @@ pub fn combine(self: *Self) !Level {
         }
 
         const room = self.rooms.items[room_idx];
-        for (0..room.len) |ry| {
-            for (0..room[ry].len) |rx| {
-                level.tilemap.get(x + rx + 1, y + ry + 1).* = room[ry][rx];
+        for (0..room.tilemap.len) |ry| {
+            for (0..room.tilemap[ry].len) |rx| {
+                level.tilemap.get(x + rx + 1, y + ry + 1).* = room.tilemap[ry][rx];
             }
+        }
+
+        for (room.enemies.items) |placeholder| {
+            const enemies = &enemies_per_difficulty.items[node.difficulty_class];
+            try level.enemies.append(.{
+                .pos = placeholder.pos,
+                .enemy = enemies.get(placeholder.type),
+            });
         }
 
         room_idx = (room_idx + 1) % self.rooms.items.len;
