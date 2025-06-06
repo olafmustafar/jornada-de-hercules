@@ -197,27 +197,7 @@ const World = struct {
         if ((rl.Vector2Equals(movement, rl.Vector2Zero())) == 0) {
             movement = rl.Vector2Normalize(movement);
             var new_pos = rl.Vector2Add(self.player_position, rl.Vector2Scale(movement, delta * self.player_speed));
-
-            for (self.collidable_tiles.items) |pos| {
-                const rec = rl.Rectangle{ .x = pos.x - 0.5, .y = pos.y - 0.5, .width = 1, .height = 1 };
-                if (rl.CheckCollisionCircleRec(new_pos, self.player_radius, rec)) {
-                    const a = vec2(rec.x, rec.y); //upper coner
-                    const b = vec2(rec.x + rec.width, rec.y + rec.height); //lower corner
-                    const p = new_pos; //player
-                    const r = self.player_radius; //radius
-
-                    if (p.x < a.x and p.y > a.y and p.y < b.y) {
-                        new_pos.x = a.x - r;
-                    } else if (p.x > b.x and p.y > a.y and p.y < b.y) {
-                        new_pos.x = b.x + r;
-                    } else if (p.y < a.y and p.x > a.x and p.x < b.x) {
-                        new_pos.y = a.y - r;
-                    } else if (p.y > b.y and p.x > a.x and p.x < b.x) {
-                        new_pos.y = b.y + r;
-                    }
-                }
-            }
-
+            new_pos = self.solve_collisions(new_pos, self.player_radius);
             self.player_position = new_pos;
             self.player_current_animation = self.player_sprint_animation;
             self.player_angle = rl.Vector2Angle(vec2(0, 1), movement) * -rl.RAD2DEG;
@@ -236,6 +216,7 @@ const World = struct {
 
             self.tile_models.set(.door, self.door_closed);
             e.pos = rl.Vector2MoveTowards(e.pos, self.player_position, 5 * e.enemy.velocity * delta);
+            e.pos = self.solve_collisions(e.pos, e.radius);
         }
     }
 
@@ -293,7 +274,27 @@ const World = struct {
         return vec3(pos.x * 0.90, 0, pos.y * 0.90);
     }
 
-    // fn solve_collisions(self: * TODO
+    fn solve_collisions(self: *World, circ: rl.Vector2, radius: f32) rl.Vector2 {
+        var res = circ;
+        for (self.collidable_tiles.items) |pos| {
+            const rec = rl.Rectangle{ .x = pos.x - 0.5, .y = pos.y - 0.5, .width = 1, .height = 1 };
+            if (rl.CheckCollisionCircleRec(circ, radius, rec)) {
+                const a = vec2(rec.x, rec.y); //upper coner
+                const b = vec2(rec.x + rec.width, rec.y + rec.height); //lower corner
+
+                if (circ.x < a.x and circ.y > a.y and circ.y < b.y) {
+                    res.x = a.x - radius;
+                } else if (circ.x > b.x and circ.y > a.y and circ.y < b.y) {
+                    res.x = b.x + radius;
+                } else if (circ.y < a.y and circ.x > a.x and circ.x < b.x) {
+                    res.y = a.y - radius;
+                } else if (circ.y > b.y and circ.x > a.x and circ.x < b.x) {
+                    res.y = b.y + radius;
+                }
+            }
+        }
+        return res;
+    }
 };
 
 pub fn main() !void {
