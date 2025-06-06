@@ -36,6 +36,8 @@ const World = struct {
     camera: rl.Camera3D,
     collidable_tiles: std.ArrayList(rl.Vector2),
     enemies: std.ArrayList(EnemyInstance),
+    door_open: rl.Model,
+    door_closed: rl.Model,
 
     player_position: rl.Vector2,
     player_radius: f32,
@@ -68,6 +70,12 @@ const World = struct {
 
         const ambientLoc = rl.GetShaderLocation(self.shader, "ambient");
         rl.SetShaderValue(self.shader, ambientLoc, &[4]f32{ 2.0, 2.0, 2.0, 10.0 }, rl.SHADER_UNIFORM_VEC4);
+
+        self.door_open = rl.LoadModel("assets/door_open.glb");
+        try self.models.append(self.door_open);
+
+        self.door_closed = rl.LoadModel("assets/door_closed.glb");
+        try self.models.append(self.door_closed);
 
         self.tile_models = .init(.{
             .empty = null,
@@ -143,19 +151,20 @@ const World = struct {
 
     pub fn update(self: *World) void {
         for (self.level.room_rects.items) |room_rec| {
-            const rlrec = rl.Rectangle{ .x = room_rec.x, .y = room_rec.y, .width = room_rec.w, .height = room_rec.h };
+            const rlrec = rl.Rectangle{ .x = room_rec.x - 0.5, .y = room_rec.y - 0.5, .width = room_rec.w, .height = room_rec.h };
             if (rl.CheckCollisionPointRec(self.player_position, rlrec)) {
                 self.curr_room = rl.Rectangle{ .x = room_rec.x, .y = room_rec.y, .width = room_rec.w, .height = room_rec.h };
             }
         }
 
         const center = vec2(
-            self.curr_room.x + (self.curr_room.width / 2) - 0.5,
-            self.curr_room.y + (self.curr_room.height / 2) - 0.5,
+            self.curr_room.x + (self.curr_room.width / 2),
+            self.curr_room.y + (self.curr_room.height / 2),
         );
         const dist = rl.Vector3Distance(self.camera.target, to_world_pos(center));
         self.camera.target = rl.Vector3MoveTowards(self.camera.target, to_world_pos(center), rl.logf(dist + 1.1) * 0.1);
-        self.camera.position = rl.Vector3Add(self.camera.target, vec3(0, 8, 0.5));
+        // self.camera.position = rl.Vector3Add(self.camera.target, vec3(0, 8, 0.5));
+        self.camera.position = rl.Vector3Add(self.camera.target, vec3(0, 10, 0.5));
         rl.UpdateCamera(&self.camera, rl.CAMERA_CUSTOM);
         rl.SetShaderValue(
             self.shader,
@@ -220,11 +229,13 @@ const World = struct {
         rl.UpdateModelAnimation(self.player_model, self.player_current_animation, self.player_animation_counter);
         if (self.player_animation_counter >= self.player_current_animation.frameCount) self.player_animation_counter = 0;
 
+        self.tile_models.set(.door, self.door_open);
         for (self.enemies.items) |*e| {
             if (!rl.CheckCollisionPointRec(e.pos, self.curr_room))
                 continue;
 
-            e.pos = rl.Vector2MoveTowards(e.pos, self.player_position, e.enemy.velocity * delta);
+            self.tile_models.set(.door, self.door_closed);
+            e.pos = rl.Vector2MoveTowards(e.pos, self.player_position, 5 * e.enemy.velocity * delta);
         }
     }
 
@@ -243,18 +254,21 @@ const World = struct {
         rl.BeginMode3D(self.camera);
         {
             rl.ClearBackground(rl.DARKGRAY);
-            rl.DrawRectangleLinesEx(self.curr_room, 1, rl.RED);
 
             for (0..self.level.tilemap.height) |y| {
                 for (0..self.level.tilemap.width) |x| {
                     const tile = self.level.tilemap.get(x, y).*;
                     if (self.tile_models.get(tile)) |model| {
-                        rl.DrawModel(
-                            model,
-                            World.to_world_pos(vec2(@floatFromInt(x), @floatFromInt(y))),
-                            1.0,
-                            rl.WHITE,
-                        );
+                        if (tile == .door) {
+                            if (self.level.tilemap.get(x + 1, y).* == .door) {
+                                rl.DrawModelEx(model, to_world_pos(vec2(@as(f32, @floatFromInt(x)) + 0.5, @floatFromInt(y))), vec3(0.0, 1.0, 0.0), 90.0, rl.Vector3One(), rl.WHITE);
+                            }
+                            if (self.level.tilemap.get(x, y + 1).* == .door) {
+                                rl.DrawModel(model, World.to_world_pos(vec2(@floatFromInt(x), @as(f32, @floatFromInt(y)) + 0.5)), 1.0, rl.WHITE);
+                            }
+                        } else {
+                            rl.DrawModel(model, World.to_world_pos(vec2(@floatFromInt(x), @floatFromInt(y))), 1.0, rl.WHITE);
+                        }
                     }
                 }
             }
@@ -278,6 +292,8 @@ const World = struct {
     fn to_world_pos(pos: rl.Vector2) rl.Vector3 {
         return vec3(pos.x * 0.90, 0, pos.y * 0.90);
     }
+
+    // fn solve_collisions(self: * TODO
 };
 
 pub fn main() !void {
@@ -295,6 +311,7 @@ pub fn main() !void {
     try pcg.generate(.{ .room = .{ .generate = .{} } });
     try pcg.generate(.{ .room = .{ .generate = .{} } });
     try pcg.generate(.{ .room = .{ .generate = .{} } });
+    try pcg.generate(.{ .enemies = .{ .generate = .{} } });
     try pcg.generate(.{ .architecture = .{ .generate = .{
         .diameter = 10,
         .max_corridor_length = 5,
