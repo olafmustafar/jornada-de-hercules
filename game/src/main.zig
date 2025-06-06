@@ -7,7 +7,8 @@ const Tile = PCGManager.Contents.Tile;
 const Level = PCGManager.Contents.Level;
 const Enemy = PCGManager.Contents.Enemy;
 const EnemyInstance = struct {
-    // model: rl.Model,
+    model: ?rl.Model,
+    angle: f32,
     enemy: Enemy,
     active: bool,
     pos: rl.Vector2,
@@ -127,12 +128,19 @@ const World = struct {
 
         for (self.level.enemies.items) |e| {
             try self.enemies.append(EnemyInstance{
+                .model = rl.LoadModel("assets/snake.glb"),
+                .angle = 0.0,
                 .enemy = e.enemy,
                 .active = true,
                 .health_points = e.enemy.health,
                 .pos = vec2(@floatFromInt(e.pos.x), @floatFromInt(e.pos.y)),
                 .radius = 0.1,
             });
+        }
+
+        for (self.enemies.items) |enemy| {
+            if (enemy.model) |model|
+                try self.models.append(model);
         }
 
         for (self.models.items) |model|
@@ -215,8 +223,10 @@ const World = struct {
                 continue;
 
             self.tile_models.set(.door, self.door_closed);
+            const previous = e.pos;
             e.pos = rl.Vector2MoveTowards(e.pos, self.player_position, 5 * e.enemy.velocity * delta);
             e.pos = self.solve_collisions(e.pos, e.radius);
+            e.angle = rl.Vector2Angle(vec2(0, 1), rl.Vector2Normalize(rl.Vector2Subtract(e.pos, previous))) * -rl.RAD2DEG;
         }
     }
 
@@ -255,7 +265,11 @@ const World = struct {
             }
 
             for (self.enemies.items) |e| {
-                rl.DrawCapsule(to_world_pos(e.pos), to_world_pos_y(e.pos, 1), e.radius, 10, 3, rl.RED);
+                if (e.model) |model| {
+                    rl.DrawModelEx(model, to_world_pos(e.pos), vec3(0, 1, 0), e.angle, rl.Vector3Scale(rl.Vector3One(), 0.3), rl.WHITE);
+                } else {
+                    rl.DrawCapsule(to_world_pos(e.pos), to_world_pos_y(e.pos, 1), e.radius, 10, 3, rl.RED);
+                }
             }
 
             rl.DrawModelEx(self.player_model, to_world_pos(self.player_position), vec3(0, 1, 0), self.player_angle, rl.Vector3Scale(rl.Vector3One(), 0.5), rl.WHITE);
