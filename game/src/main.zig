@@ -9,13 +9,21 @@ const rl = @import("raylib.zig");
 const rll = @import("rlights.zig");
 
 const EnemyInstance = struct {
-    model: ?rl.Model,
+    model: rl.Model,
+    animation: rl.ModelAnimation,
     angle: f32,
     enemy: Enemy,
     active: bool,
     pos: rl.Vector2,
     health_points: f32,
     radius: f32,
+    animation_frame: i32,
+};
+
+const Animations = struct {
+    run: rl.ModelAnimation,
+    idle: rl.ModelAnimation,
+    attack: rl.ModelAnimation,
 };
 
 const window_w = 800;
@@ -44,6 +52,9 @@ const World = struct {
     door_open: rl.Model,
     door_closed: rl.Model,
 
+    enemy_models: std.EnumArray(Enemy.Type, ?rl.Model),
+    enemy_animations: std.EnumArray(Enemy.Type, ?Animations),
+
     player_position: rl.Vector2,
     player_radius: f32,
     player_angle: f32,
@@ -54,7 +65,7 @@ const World = struct {
     player_idle_animation: rl.ModelAnimation,
     player_animation_counter: i32,
 
-    curr_room: rl.Rectangle,
+    curr_room: ?rl.Rectangle,
 
     pub fn init(allocator: std.mem.Allocator, level: Level) !World {
         var self: World = undefined;
@@ -102,6 +113,27 @@ const World = struct {
             }
         }
 
+        self.enemy_models = .init(.{
+            .slow_chaser = rl.LoadModel("assets/spider.glb"),
+            .fast_chaser = rl.LoadModel("assets/rat.glb"),
+            .shooter = rl.LoadModel("assets/snake.glb"),
+            .walking_shooter = rl.LoadModel("assets/snake.glb"),
+            .flyer = rl.LoadModel("assets/wasp.glb"),
+        });
+
+        for (self.enemy_models.values) |model_opt| {
+            if (model_opt) |model| {
+                try self.models.append(model);
+            }
+        }
+
+        self.enemy_animations = .initUndefined();
+        try load_animation(&self, .slow_chaser, "assets/spider.glb", 0, 2, 4);
+        try load_animation(&self, .fast_chaser, "assets/rat.glb", 0, 2, 4);
+        try load_animation(&self, .shooter, "assets/snake.glb", 0, 2, 4);
+        try load_animation(&self, .walking_shooter, "assets/snake.glb", 0, 2, 4);
+        try load_animation(&self, .flyer, "assets/wasp.glb", 0, 2, 2);
+
         self.player_model = rl.LoadModel("assets/player2.glb");
         try self.models.append(self.player_model);
         var animation_count: usize = 0;
@@ -114,6 +146,7 @@ const World = struct {
         self.player_radius = 0.1;
         self.player_angle = 0.00;
         self.player_speed = 3.00;
+        try self.models_animations.append(player_animations);
 
         self.collidable_tiles = .init(allocator);
         self.doors = .init(allocator);
@@ -135,20 +168,20 @@ const World = struct {
 
         for (self.level.enemies.items) |e| {
             try self.enemies.append(EnemyInstance{
-                .model = rl.LoadModel("assets/snake.glb"),
+                .model = self.enemy_models.get(e.enemy.type).?,
+                .animation = self.enemy_animations.get(e.enemy.type).?.run,
                 .angle = 0.0,
                 .enemy = e.enemy,
                 .active = true,
                 .health_points = e.enemy.health,
                 .pos = vec2(@floatFromInt(e.pos.x), @floatFromInt(e.pos.y)),
                 .radius = 0.1,
+                .animation_frame = 0,
             });
         }
 
-        for (self.enemies.items) |enemy| {
-            if (enemy.model) |model|
-                try self.models.append(model);
-        }
+        for (self.enemies.items) |enemy|
+            try self.models.append(enemy.model);
 
         for (self.models.items) |model|
             model.materials[1].shader = self.shader;
@@ -165,6 +198,7 @@ const World = struct {
     }
 
     pub fn update(self: *World) void {
+        self.curr_room = null;
         for (self.level.room_rects.items) |room_rec| {
             const rlrec = rl.Rectangle{ .x = room_rec.x - 0.5, .y = room_rec.y - 0.5, .width = room_rec.w, .height = room_rec.h };
             if (rl.CheckCollisionPointRec(self.player_position, rlrec)) {
@@ -172,10 +206,14 @@ const World = struct {
             }
         }
 
-        const center = vec2(
-            self.curr_room.x + (self.curr_room.width / 2),
-            self.curr_room.y + (self.curr_room.height / 2),
-        );
+        const center = blk: {
+            if (self.curr_room) |room| {
+                break :blk vec2(room.x + (room.width / 2), room.y + (room.height / 2));
+            } else {
+                break :blk self.player_position;
+            }
+        };
+
         const dist = rl.Vector3Distance(self.camera.target, to_world_pos(center));
         self.camera.target = rl.Vector3MoveTowards(self.camera.target, to_world_pos(center), rl.logf(dist + 1.1) * 0.1);
         self.camera.position = rl.Vector3Add(self.camera.target, vec3(0, 8, 0.5));
@@ -190,14 +228,14 @@ const World = struct {
         rll.UpdateLightValues(self.shader, self.light);
 
         //freeze while not focusing on room center
-        if (rl.FloatEquals(dist, 0) == 0) {
+        if (self.curr_room != null and rl.FloatEquals(dist, 0) == 0) {
             return;
         }
 
         self.doors_open = true;
         self.tile_models.set(.door, self.door_open);
         for (self.enemies.items) |*e| {
-            if (rl.CheckCollisionPointRec(e.pos, self.curr_room)) {
+            if (self.curr_room != null and rl.CheckCollisionPointRec(e.pos, self.curr_room.?)) {
                 self.doors_open = false;
                 self.tile_models.set(.door, self.door_closed);
                 break;
@@ -233,14 +271,20 @@ const World = struct {
         rl.UpdateModelAnimation(self.player_model, self.player_current_animation, self.player_animation_counter);
         if (self.player_animation_counter >= self.player_current_animation.frameCount) self.player_animation_counter = 0;
 
-        for (self.enemies.items) |*e| {
-            if (!rl.CheckCollisionPointRec(e.pos, self.curr_room))
-                continue;
+        if (self.curr_room) |curr_room| {
+            for (self.enemies.items) |*e| {
+                if (!rl.CheckCollisionPointRec(e.pos, curr_room))
+                    continue;
 
-            const previous = e.pos;
-            e.pos = rl.Vector2MoveTowards(e.pos, self.player_position, 5 * e.enemy.velocity * delta);
-            e.pos = self.solve_collisions(e.pos, e.radius);
-            e.angle = rl.Vector2Angle(vec2(0, 1), rl.Vector2Normalize(rl.Vector2Subtract(e.pos, previous))) * -rl.RAD2DEG;
+                const previous = e.pos;
+                e.pos = rl.Vector2MoveTowards(e.pos, self.player_position, 5 * e.enemy.velocity * delta);
+                e.pos = self.solve_collisions(e.pos, e.radius);
+                e.angle = rl.Vector2Angle(vec2(0, 1), rl.Vector2Normalize(rl.Vector2Subtract(e.pos, previous))) * -rl.RAD2DEG;
+
+                e.animation_frame += 1;
+                rl.UpdateModelAnimation(e.model, e.animation, e.animation_frame);
+                if (e.animation_frame >= e.animation.frameCount) e.animation_frame = 0;
+            }
         }
     }
 
@@ -278,13 +322,8 @@ const World = struct {
                 }
             }
 
-            for (self.enemies.items) |e| {
-                if (e.model) |model| {
-                    rl.DrawModelEx(model, to_world_pos(e.pos), vec3(0, 1, 0), e.angle, rl.Vector3Scale(rl.Vector3One(), 0.3), rl.WHITE);
-                } else {
-                    rl.DrawCapsule(to_world_pos(e.pos), to_world_pos_y(e.pos, 1), e.radius, 10, 3, rl.RED);
-                }
-            }
+            for (self.enemies.items) |e|
+                rl.DrawModelEx(e.model, to_world_pos(e.pos), vec3(0, 1, 0), e.angle, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
 
             rl.DrawModelEx(self.player_model, to_world_pos(self.player_position), vec3(0, 1, 0), self.player_angle, rl.Vector3Scale(rl.Vector3One(), 0.5), rl.WHITE);
             rl.DrawSphere(self.light.position, 0.15, rl.YELLOW);
@@ -304,7 +343,7 @@ const World = struct {
 
     fn solve_collisions(self: *World, circ: rl.Vector2, radius: f32) rl.Vector2 {
         const new_pos = solve_collisions_impl(circ, radius, self.collidable_tiles);
-        return if (self.doors_open) new_pos else solve_collisions_impl(circ, radius, self.doors);
+        return if (self.doors_open) new_pos else solve_collisions_impl(new_pos, radius, self.doors);
     }
 
     fn solve_collisions_impl(circ: rl.Vector2, radius: f32, tiles: std.ArrayList(rl.Vector2)) rl.Vector2 {
@@ -327,6 +366,13 @@ const World = struct {
             }
         }
         return res;
+    }
+
+    fn load_animation(self: *World, enemy_type: Enemy.Type, name: []const u8, atk_idx: usize, idle_idx: usize, run_idx: usize) !void {
+        var anim_count: i32 = 0;
+        const anims = rl.LoadModelAnimations(@ptrCast(name), @ptrCast(&anim_count));
+        self.enemy_animations.set(enemy_type, Animations{ .attack = anims[atk_idx], .idle = anims[idle_idx], .run = anims[run_idx] });
+        try self.models_animations.append(anims);
     }
 };
 

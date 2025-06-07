@@ -30,7 +30,7 @@ fn get_random_enemies(ctx: *Context, classes: usize) !EnemiesPerDifficulty {
         const multiplier = ease_in_out_quad(frac);
 
         const fast_chaser = Enemy{
-            .type = .slow_chaser,
+            .type = .fast_chaser,
             .damage = multiplier * 0.2,
             .health = multiplier * 0.4,
             .velocity = multiplier,
@@ -38,7 +38,7 @@ fn get_random_enemies(ctx: *Context, classes: usize) !EnemiesPerDifficulty {
         };
 
         const slow_chaser = Enemy{
-            .type = .fast_chaser,
+            .type = .slow_chaser,
             .damage = multiplier,
             .health = multiplier,
             .velocity = multiplier * 0.4,
