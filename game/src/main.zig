@@ -1,11 +1,13 @@
 const std = @import("std");
-const rl = @import("raylib.zig");
-const rll = @import("rlights.zig");
-const PCGManager = @import("pcgmanager");
 
+const PCGManager = @import("pcgmanager");
 const Tile = PCGManager.Contents.Tile;
 const Level = PCGManager.Contents.Level;
 const Enemy = PCGManager.Contents.Enemy;
+
+const rl = @import("raylib.zig");
+const rll = @import("rlights.zig");
+
 const EnemyInstance = struct {
     model: ?rl.Model,
     angle: f32,
@@ -37,6 +39,8 @@ const World = struct {
     camera: rl.Camera3D,
     collidable_tiles: std.ArrayList(rl.Vector2),
     enemies: std.ArrayList(EnemyInstance),
+    doors: std.ArrayList(rl.Vector2),
+    doors_open: bool,
     door_open: rl.Model,
     door_closed: rl.Model,
 
@@ -72,6 +76,7 @@ const World = struct {
         const ambientLoc = rl.GetShaderLocation(self.shader, "ambient");
         rl.SetShaderValue(self.shader, ambientLoc, &[4]f32{ 2.0, 2.0, 2.0, 10.0 }, rl.SHADER_UNIFORM_VEC4);
 
+        self.doors_open = false;
         self.door_open = rl.LoadModel("assets/door_open.glb");
         try self.models.append(self.door_open);
 
@@ -111,13 +116,15 @@ const World = struct {
         self.player_speed = 3.00;
 
         self.collidable_tiles = .init(allocator);
+        self.doors = .init(allocator);
         for (0..self.level.tilemap.height) |y| {
             for (0..self.level.tilemap.width) |x| {
                 const tile = self.level.tilemap.get(x, y);
                 if (tile.is_collidable()) {
                     try self.collidable_tiles.append(vec2(@floatFromInt(x), @floatFromInt(y)));
-                }
-                if (tile.* == .entrance) {
+                } else if (tile.* == .door) {
+                    try self.doors.append(vec2(@floatFromInt(x), @floatFromInt(y)));
+                } else if (tile.* == .entrance) {
                     self.player_position = vec2(@floatFromInt(x), @floatFromInt(y));
                     self.camera.target = to_world_pos(self.player_position);
                 }
@@ -171,8 +178,7 @@ const World = struct {
         );
         const dist = rl.Vector3Distance(self.camera.target, to_world_pos(center));
         self.camera.target = rl.Vector3MoveTowards(self.camera.target, to_world_pos(center), rl.logf(dist + 1.1) * 0.1);
-        // self.camera.position = rl.Vector3Add(self.camera.target, vec3(0, 8, 0.5));
-        self.camera.position = rl.Vector3Add(self.camera.target, vec3(0, 10, 0.5));
+        self.camera.position = rl.Vector3Add(self.camera.target, vec3(0, 8, 0.5));
         rl.UpdateCamera(&self.camera, rl.CAMERA_CUSTOM);
         rl.SetShaderValue(
             self.shader,
@@ -186,6 +192,16 @@ const World = struct {
         //freeze while not focusing on room center
         if (rl.FloatEquals(dist, 0) == 0) {
             return;
+        }
+
+        self.doors_open = true;
+        self.tile_models.set(.door, self.door_open);
+        for (self.enemies.items) |*e| {
+            if (rl.CheckCollisionPointRec(e.pos, self.curr_room)) {
+                self.doors_open = false;
+                self.tile_models.set(.door, self.door_closed);
+                break;
+            }
         }
 
         const delta = rl.GetFrameTime();
@@ -217,12 +233,10 @@ const World = struct {
         rl.UpdateModelAnimation(self.player_model, self.player_current_animation, self.player_animation_counter);
         if (self.player_animation_counter >= self.player_current_animation.frameCount) self.player_animation_counter = 0;
 
-        self.tile_models.set(.door, self.door_open);
         for (self.enemies.items) |*e| {
             if (!rl.CheckCollisionPointRec(e.pos, self.curr_room))
                 continue;
 
-            self.tile_models.set(.door, self.door_closed);
             const previous = e.pos;
             e.pos = rl.Vector2MoveTowards(e.pos, self.player_position, 5 * e.enemy.velocity * delta);
             e.pos = self.solve_collisions(e.pos, e.radius);
@@ -289,8 +303,13 @@ const World = struct {
     }
 
     fn solve_collisions(self: *World, circ: rl.Vector2, radius: f32) rl.Vector2 {
+        const new_pos = solve_collisions_impl(circ, radius, self.collidable_tiles);
+        return if (self.doors_open) new_pos else solve_collisions_impl(circ, radius, self.doors);
+    }
+
+    fn solve_collisions_impl(circ: rl.Vector2, radius: f32, tiles: std.ArrayList(rl.Vector2)) rl.Vector2 {
         var res = circ;
-        for (self.collidable_tiles.items) |pos| {
+        for (tiles.items) |pos| {
             const rec = rl.Rectangle{ .x = pos.x - 0.5, .y = pos.y - 0.5, .width = 1, .height = 1 };
             if (rl.CheckCollisionCircleRec(circ, radius, rec)) {
                 const a = vec2(rec.x, rec.y); //upper coner
