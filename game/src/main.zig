@@ -5,8 +5,12 @@ const Tile = PCGManager.Contents.Tile;
 const Level = PCGManager.Contents.Level;
 const Enemy = PCGManager.Contents.Enemy;
 
+const commons = @import("commons.zig");
+const vec2 = commons.vec2;
+const vec3 = commons.vec3;
 const rl = @import("raylib.zig");
 const rll = @import("rlights.zig");
+const Player = @import("Player.zig");
 
 const EnemyInstance = struct {
     model: rl.Model,
@@ -29,14 +33,6 @@ const Animations = struct {
 const window_w = 800;
 const window_h = 600;
 
-pub fn vec3(x: f32, y: f32, z: f32) rl.Vector3 {
-    return rl.Vector3{ .x = x, .y = y, .z = z };
-}
-
-pub fn vec2(x: f32, y: f32) rl.Vector2 {
-    return rl.Vector2{ .x = x, .y = y };
-}
-
 const World = struct {
     level: Level,
     models: std.ArrayList(rl.Model),
@@ -55,15 +51,7 @@ const World = struct {
     enemy_models: std.EnumArray(Enemy.Type, ?rl.Model),
     enemy_animations: std.EnumArray(Enemy.Type, ?Animations),
 
-    player_position: rl.Vector2,
-    player_radius: f32,
-    player_angle: f32,
-    player_speed: f32,
-    player_model: rl.Model,
-    player_current_animation: rl.ModelAnimation,
-    player_sprint_animation: rl.ModelAnimation,
-    player_idle_animation: rl.ModelAnimation,
-    player_animation_counter: i32,
+    player: Player,
 
     curr_room: ?rl.Rectangle,
 
@@ -75,7 +63,7 @@ const World = struct {
 
         self.camera = rl.Camera3D{
             .position = vec3(10.0, 5.0, 10.0),
-            .target = to_world_pos(self.player_position),
+            .target = to_world_pos(self.player.position),
             .up = vec3(0.0, 1.0, 0.0),
             .fovy = 60.0,
             .projection = rl.CAMERA_PERSPECTIVE,
@@ -115,7 +103,7 @@ const World = struct {
 
         self.enemy_models = .init(.{
             .slow_chaser = rl.LoadModel("assets/spider.glb"),
-            .fast_chaser = rl.LoadModel("assets/rat.glb"),
+            .fast_chaser = rl.LoadModel("assets/spider.glb"),
             .shooter = rl.LoadModel("assets/snake.glb"),
             .walking_shooter = rl.LoadModel("assets/snake.glb"),
             .flyer = rl.LoadModel("assets/wasp.glb"),
@@ -129,24 +117,12 @@ const World = struct {
 
         self.enemy_animations = .initUndefined();
         try load_animation(&self, .slow_chaser, "assets/spider.glb", 0, 2, 4);
-        try load_animation(&self, .fast_chaser, "assets/rat.glb", 0, 2, 4);
+        try load_animation(&self, .fast_chaser, "assets/spider.glb", 0, 2, 4);
         try load_animation(&self, .shooter, "assets/snake.glb", 0, 2, 4);
         try load_animation(&self, .walking_shooter, "assets/snake.glb", 0, 2, 4);
         try load_animation(&self, .flyer, "assets/wasp.glb", 0, 2, 2);
 
-        self.player_model = rl.LoadModel("assets/player2.glb");
-        try self.models.append(self.player_model);
-        var animation_count: usize = 0;
-        const player_animations = rl.LoadModelAnimations("assets/player2.glb", @ptrCast(&animation_count));
-        self.player_sprint_animation = player_animations[38];
-        self.player_idle_animation = player_animations[9];
-        self.player_current_animation = self.player_idle_animation;
-        self.player_animation_counter = 0;
-        self.player_position = vec2(0, 0);
-        self.player_radius = 0.1;
-        self.player_angle = 0.00;
-        self.player_speed = 3.00;
-        try self.models_animations.append(player_animations);
+        self.player = try .init(&self.models, &self.models_animations);
 
         self.collidable_tiles = .init(allocator);
         self.doors = .init(allocator);
@@ -158,8 +134,8 @@ const World = struct {
                 } else if (tile.* == .door) {
                     try self.doors.append(vec2(@floatFromInt(x), @floatFromInt(y)));
                 } else if (tile.* == .entrance) {
-                    self.player_position = vec2(@floatFromInt(x), @floatFromInt(y));
-                    self.camera.target = to_world_pos(self.player_position);
+                    self.player.position = vec2(@floatFromInt(x), @floatFromInt(y));
+                    self.camera.target = to_world_pos(self.player.position);
                 }
             }
         }
@@ -201,16 +177,16 @@ const World = struct {
         self.curr_room = null;
         for (self.level.room_rects.items) |room_rec| {
             const rlrec = rl.Rectangle{ .x = room_rec.x - 0.5, .y = room_rec.y - 0.5, .width = room_rec.w, .height = room_rec.h };
-            if (rl.CheckCollisionPointRec(self.player_position, rlrec)) {
+            if (rl.CheckCollisionPointRec(self.player.position, rlrec)) {
                 self.curr_room = rl.Rectangle{ .x = room_rec.x, .y = room_rec.y, .width = room_rec.w, .height = room_rec.h };
             }
         }
 
         const center = blk: {
             if (self.curr_room) |room| {
-                break :blk vec2(room.x + (room.width / 2), room.y + (room.height / 2));
+                break :blk vec2(room.x + (room.width / 2) - 0.5, room.y + (room.height / 2) - 0.5);
             } else {
-                break :blk self.player_position;
+                break :blk self.player.position;
             }
         };
 
@@ -243,33 +219,9 @@ const World = struct {
         }
 
         const delta = rl.GetFrameTime();
-        var movement = rl.Vector2Zero();
-        if (rl.IsKeyDown(rl.KEY_D) or rl.IsKeyDown(rl.KEY_RIGHT)) {
-            movement = rl.Vector2Add(movement, vec2(1, 0));
-        }
-        if (rl.IsKeyDown(rl.KEY_A) or rl.IsKeyDown(rl.KEY_LEFT)) {
-            movement = rl.Vector2Add(movement, vec2(-1, 0));
-        }
-        if (rl.IsKeyDown(rl.KEY_W) or rl.IsKeyDown(rl.KEY_UP)) {
-            movement = rl.Vector2Add(movement, vec2(0, -1));
-        }
-        if (rl.IsKeyDown(rl.KEY_S) or rl.IsKeyDown(rl.KEY_DOWN)) {
-            movement = rl.Vector2Add(movement, vec2(0, 1));
-        }
-        if ((rl.Vector2Equals(movement, rl.Vector2Zero())) == 0) {
-            movement = rl.Vector2Normalize(movement);
-            var new_pos = rl.Vector2Add(self.player_position, rl.Vector2Scale(movement, delta * self.player_speed));
-            new_pos = self.solve_collisions(new_pos, self.player_radius);
-            self.player_position = new_pos;
-            self.player_current_animation = self.player_sprint_animation;
-            self.player_angle = rl.Vector2Angle(vec2(0, 1), movement) * -rl.RAD2DEG;
-        } else {
-            self.player_current_animation = self.player_idle_animation;
-        }
 
-        self.player_animation_counter += 1;
-        rl.UpdateModelAnimation(self.player_model, self.player_current_animation, self.player_animation_counter);
-        if (self.player_animation_counter >= self.player_current_animation.frameCount) self.player_animation_counter = 0;
+        self.player.update();
+        self.player.position = self.solve_collisions(self.player.position, self.player.radius);
 
         if (self.curr_room) |curr_room| {
             for (self.enemies.items) |*e| {
@@ -277,7 +229,7 @@ const World = struct {
                     continue;
 
                 const previous = e.pos;
-                e.pos = rl.Vector2MoveTowards(e.pos, self.player_position, 5 * e.enemy.velocity * delta);
+                e.pos = rl.Vector2MoveTowards(e.pos, self.player.position, 5 * e.enemy.velocity * delta);
                 e.pos = self.solve_collisions(e.pos, e.radius);
                 e.angle = rl.Vector2Angle(vec2(0, 1), rl.Vector2Normalize(rl.Vector2Subtract(e.pos, previous))) * -rl.RAD2DEG;
 
@@ -297,7 +249,7 @@ const World = struct {
         //     const rec = rl.Rectangle{ .x = 10 * (pos.x - 0.5), .y = 10 * (pos.y - 0.5), .width = 10, .height = 10 };
         //     rl.DrawRectangleRec(rec, rl.RED);
         // }
-        // rl.DrawCircleV(rl.Vector2Scale(self.player_position, 10), self.player_radius * 10, rl.WHITE);
+        // rl.DrawCircleV(rl.Vector2Scale(self.player.position, 10), self.player.radius * 10, rl.WHITE);
 
         rl.BeginDrawing();
         rl.BeginMode3D(self.camera);
@@ -325,7 +277,7 @@ const World = struct {
             for (self.enemies.items) |e|
                 rl.DrawModelEx(e.model, to_world_pos(e.pos), vec3(0, 1, 0), e.angle, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
 
-            rl.DrawModelEx(self.player_model, to_world_pos(self.player_position), vec3(0, 1, 0), self.player_angle, rl.Vector3Scale(rl.Vector3One(), 0.5), rl.WHITE);
+            rl.DrawModelEx(self.player.model, to_world_pos(self.player.position), vec3(0, 1, 0), self.player.angle, rl.Vector3Scale(rl.Vector3One(), 0.5), rl.WHITE);
             rl.DrawSphere(self.light.position, 0.15, rl.YELLOW);
             rl.DrawGrid(255, 0.9);
         }

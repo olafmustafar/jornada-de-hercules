@@ -1,0 +1,78 @@
+const std = @import("std");
+const rl = @import("raylib.zig");
+const c = @import("commons.zig");
+
+const Self = @This();
+
+position: rl.Vector2,
+radius: f32,
+angle: f32,
+speed: f32,
+is_attacking: bool,
+model: rl.Model,
+current_animation: rl.ModelAnimation,
+sprint_animation: rl.ModelAnimation,
+idle_animation: rl.ModelAnimation,
+attack_animation: rl.ModelAnimation,
+animation_counter: i32,
+
+pub fn init(models: *std.ArrayList(rl.Model), animations: *std.ArrayList(*rl.ModelAnimation)) !Self {
+    var animation_count: usize = 0;
+    const player_animations = rl.LoadModelAnimations("assets/player.glb", @ptrCast(&animation_count));
+    const self = Self{
+        .model = rl.LoadModel("assets/player.glb"),
+        .sprint_animation = player_animations[38],
+        .idle_animation = player_animations[9],
+        .attack_animation = player_animations[41],
+        .current_animation = player_animations[9],
+        .animation_counter = 0,
+        .position = c.vec2(0, 0),
+        .radius = 0.1,
+        .angle = 0.00,
+        .speed = 3.00,
+        .is_attacking = false,
+    };
+
+    try models.append(self.model);
+    try animations.append(player_animations);
+
+    return self;
+}
+
+pub fn update(self: *Self) void {
+    const delta = rl.GetFrameTime();
+    if (!self.is_attacking) {
+        var movement = rl.Vector2Zero();
+        if (rl.IsKeyDown(rl.KEY_D) or rl.IsKeyDown(rl.KEY_RIGHT)) {
+            movement = rl.Vector2Add(movement, c.vec2(1, 0));
+        }
+        if (rl.IsKeyDown(rl.KEY_A) or rl.IsKeyDown(rl.KEY_LEFT)) {
+            movement = rl.Vector2Add(movement, c.vec2(-1, 0));
+        }
+        if (rl.IsKeyDown(rl.KEY_W) or rl.IsKeyDown(rl.KEY_UP)) {
+            movement = rl.Vector2Add(movement, c.vec2(0, -1));
+        }
+        if (rl.IsKeyDown(rl.KEY_S) or rl.IsKeyDown(rl.KEY_DOWN)) {
+            movement = rl.Vector2Add(movement, c.vec2(0, 1));
+        }
+        if ((rl.Vector2Equals(movement, rl.Vector2Zero())) == 0) {
+            movement = rl.Vector2Normalize(movement);
+            const new_pos = rl.Vector2Add(self.position, rl.Vector2Scale(movement, delta * self.speed));
+            self.position = new_pos;
+            self.angle = rl.Vector2Angle(c.vec2(0, 1), movement) * -rl.RAD2DEG;
+            self.current_animation = self.sprint_animation;
+        } else {
+            self.current_animation = self.idle_animation;
+        }
+    }
+    if (rl.IsKeyPressed(rl.KEY_J)) {
+        self.is_attacking = true;
+        self.current_animation = self.attack_animation;
+    }
+    self.animation_counter += 1;
+    rl.UpdateModelAnimation(self.model, self.current_animation, self.animation_counter);
+    if (self.animation_counter >= self.current_animation.frameCount) {
+        self.animation_counter = 0;
+        self.is_attacking = false;
+    }
+}
