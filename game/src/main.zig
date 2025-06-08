@@ -39,7 +39,7 @@ pub fn main() !void {
     var world = try World.init(allocator, level);
 
     while (!rl.WindowShouldClose()) {
-        world.update();
+        try world.update();
         world.render();
     }
 }

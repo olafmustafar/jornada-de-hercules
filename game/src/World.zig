@@ -15,6 +15,13 @@ const rll = @import("rlights.zig");
 var g_world: ?*Self = undefined;
 
 const Self = @This();
+const Bullet = struct {
+    to_remove: bool,
+    pos: rl.Vector2,
+    vector: rl.Vector2,
+    dmg: i32,
+};
+
 const EnemyInstance = struct {
     alive: bool,
     model: rl.Model,
@@ -27,6 +34,7 @@ const EnemyInstance = struct {
     radius: f32,
     animation_frame: i32,
     inertia: rl.Vector2,
+    shooting_cooldown: f32,
 };
 
 const Animations = struct {
@@ -47,6 +55,8 @@ light: rll.Light,
 camera: rl.Camera3D,
 collidable_tiles: std.ArrayList(rl.Vector2),
 enemies: std.ArrayList(EnemyInstance),
+bullets: std.ArrayList(Bullet),
+bullet_model: rl.Model,
 doors: std.ArrayList(rl.Vector2),
 doors_open: bool,
 door_open: rl.Model,
@@ -64,6 +74,10 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
     self.level = level;
     self.models = std.ArrayList(rl.Model).init(allocator);
     self.models_animations = .init(allocator);
+
+    self.bullets = .init(allocator);
+    self.bullet_model = rl.LoadModel("assets/bullet.glb");
+    try self.models.append(self.bullet_model);
 
     self.camera = rl.Camera3D{
         .position = vec3(10.0, 5.0, 10.0),
@@ -159,6 +173,7 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
             .radius = 0.3,
             .animation_frame = 0,
             .inertia = rl.Vector2Zero(),
+            .shooting_cooldown = 0,
         });
     }
 
@@ -179,7 +194,7 @@ pub fn deinit(self: Self) void {
     self.enemies.deinit();
 }
 
-pub fn update(self: *Self) void {
+pub fn update(self: *Self) !void {
     set(self);
 
     self.curr_room = null;
@@ -200,7 +215,8 @@ pub fn update(self: *Self) void {
 
     const dist = rl.Vector3Distance(self.camera.target, to_world_pos(center));
     self.camera.target = rl.Vector3MoveTowards(self.camera.target, to_world_pos(center), rl.logf(dist + 1.1) * 0.1);
-    self.camera.position = rl.Vector3Add(self.camera.target, vec3(0, 8, 0.5));
+    // self.camera.position = rl.Vector3Add(self.camera.target, vec3(0, 8, 0.5));
+    self.camera.position = rl.Vector3Add(self.camera.target, vec3(0, 10, 0.5));
     rl.UpdateCamera(&self.camera, rl.CAMERA_CUSTOM);
     rl.SetShaderValue(
         self.shader,
@@ -236,6 +252,20 @@ pub fn update(self: *Self) void {
             if (!e.alive or !rl.CheckCollisionPointRec(e.pos, curr_room))
                 continue;
 
+            if (e.enemy.type == .shooter or e.enemy.type == .walking_shooter) {
+                if (e.shooting_cooldown <= 0) {
+                    e.shooting_cooldown = 2.3 - (e.enemy.shooting_velocity * 2);
+                    try self.bullets.append(.{
+                        .to_remove = false,
+                        .dmg = @intFromFloat(e.enemy.damage * 50),
+                        .pos = e.pos,
+                        .vector = rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(self.player.position, e.pos)), 0.1),
+                    });
+                } else {
+                    e.shooting_cooldown -= delta;
+                }
+            }
+
             if (rl.Vector2Equals(e.inertia, rl.Vector2Zero()) == 0) {
                 e.pos = rl.Vector2Add(e.pos, e.inertia);
                 e.pos = self.solve_collisions(e.pos, e.radius);
@@ -254,6 +284,26 @@ pub fn update(self: *Self) void {
             if (e.animation_frame >= e.animation.frameCount) e.animation_frame = 0;
         }
     }
+
+    for (self.bullets.items) |*e| {
+        e.pos = rl.Vector2Add(e.pos, e.vector);
+        if (self.curr_room != null and !rl.CheckCollisionPointRec(e.pos, self.curr_room.?)) {
+            e.to_remove = true;
+        } else if (rl.CheckCollisionCircles(self.player.position, self.player.radius, e.pos, 0.2)) {
+            self.player.take_hit(e.dmg);
+            e.to_remove = true;
+        }
+    }
+
+    var new_bullets : @TypeOf(self.bullets) = .init(self.bullets.allocator);
+    for( self.bullets.items ) |e|{
+        if( !e.to_remove ){
+            try new_bullets.append(e);
+        }
+    }
+    self.bullets.deinit();
+    self.bullets = new_bullets;
+
 }
 
 pub fn render(self: Self) void {
@@ -289,6 +339,11 @@ pub fn render(self: Self) void {
             rl.DrawModelEx(e.model, to_world_pos(e.pos), vec3(0, 1, 0), e.angle, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
         }
 
+        for (self.bullets.items) |e| {
+            const angle = rl.Vector2Angle(vec2(0, 1), rl.Vector2Normalize(e.vector)) * -rl.RAD2DEG;
+            rl.DrawModelEx(self.bullet_model, to_world_pos(e.pos), vec3(0, 1, 0), angle, rl.Vector3Scale(rl.Vector3One(), 0.3), rl.WHITE);
+        }
+
         rl.DrawModelEx(
             self.player.model,
             to_world_pos(self.player.position),
@@ -302,7 +357,6 @@ pub fn render(self: Self) void {
     }
 
     const life: f32 = @as(f32, @floatFromInt(self.player.health)) / @as(f32, @floatFromInt(Player.max_health));
-    std.debug.print("life: {}\n", .{life});
     rl.DrawRectangle(20, 20, 110, 30, rl.BLACK);
     rl.DrawRectangle(25, 25, 100, 20, rl.GRAY);
     rl.DrawRectangle(25, 25, @as(i32, @intFromFloat(life * 100.0)), 20, rl.RED);
