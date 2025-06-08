@@ -4,6 +4,7 @@ const World = @import("World.zig");
 const c = @import("commons.zig");
 
 const Self = @This();
+pub const max_health = 100;
 
 alive: bool,
 position: rl.Vector2,
@@ -37,7 +38,7 @@ pub fn init(models: *std.ArrayList(rl.Model), animations: *std.ArrayList(*rl.Mod
         .radius = 0.2,
         .angle = 0.00,
         .speed = 3.00,
-        .health = 100,
+        .health = max_health,
         .is_attacking = false,
         .immunity_frames = 0.0,
     };
@@ -58,7 +59,6 @@ pub fn update(self: *Self) void {
         }
         return;
     }
-    std.debug.print("{}\n", .{self.immunity_frames});
     if( self.immunity_frames > 0 ) self.immunity_frames -= delta;
 
     if (!self.is_attacking) {

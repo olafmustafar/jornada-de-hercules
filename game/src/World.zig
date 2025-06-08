@@ -258,8 +258,12 @@ pub fn update(self: *Self) void {
 
 pub fn render(self: Self) void {
     rl.BeginDrawing();
-    rl.BeginMode3D(self.camera);
+    defer rl.EndDrawing();
+
     {
+        rl.BeginMode3D(self.camera);
+        defer rl.EndMode3D();
+
         rl.ClearBackground(rl.DARKGRAY);
 
         for (0..self.level.tilemap.height) |y| {
@@ -296,8 +300,13 @@ pub fn render(self: Self) void {
 
         rl.DrawSphere(self.light.position, 0.15, rl.YELLOW);
     }
-    rl.EndMode3D();
-    rl.EndDrawing();
+
+    const life: f32 = @as(f32, @floatFromInt(self.player.health)) / @as(f32, @floatFromInt(Player.max_health));
+    std.debug.print("life: {}\n", .{life});
+    rl.DrawRectangle(20, 20, 110, 30, rl.BLACK);
+    rl.DrawRectangle(25, 25, 100, 20, rl.GRAY);
+    rl.DrawRectangle(25, 25, @as(i32, @intFromFloat(life * 100.0)), 20, rl.RED);
+    rl.DrawText("HP", 25, 25, 20, rl.WHITE);
 }
 
 pub fn get() *Self {
