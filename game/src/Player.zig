@@ -65,14 +65,24 @@ pub fn update(self: *Self) void {
             self.current_animation = self.idle_animation;
         }
     }
-    if (rl.IsKeyPressed(rl.KEY_J)) {
+    if (!self.is_attacking and rl.IsKeyPressed(rl.KEY_J)) {
         self.is_attacking = true;
+        self.animation_counter = 0;
         self.current_animation = self.attack_animation;
     }
-    self.animation_counter += 1;
-    rl.UpdateModelAnimation(self.model, self.current_animation, self.animation_counter);
-    if (self.animation_counter >= self.current_animation.frameCount) {
-        self.animation_counter = 0;
-        self.is_attacking = false;
+
+    if (self.is_attacking) {
+        self.animation_counter += 2;
+        rl.UpdateModelAnimation(self.model, self.current_animation, self.animation_counter);
+        if (self.animation_counter >= self.current_animation.frameCount) {
+            self.is_attacking = false;
+            self.animation_counter = 0;
+        }
+    } else {
+        self.animation_counter += 1;
+        rl.UpdateModelAnimation(self.model, self.current_animation, self.animation_counter);
+        if (self.animation_counter >= self.current_animation.frameCount) {
+            self.animation_counter = 0;
+        }
     }
 }
