@@ -5,6 +5,7 @@ const c = @import("commons.zig");
 
 const Self = @This();
 
+alive: bool,
 position: rl.Vector2,
 radius: f32,
 angle: f32,
@@ -15,23 +16,30 @@ current_animation: rl.ModelAnimation,
 sprint_animation: rl.ModelAnimation,
 idle_animation: rl.ModelAnimation,
 attack_animation: rl.ModelAnimation,
+die_animation: rl.ModelAnimation,
 animation_counter: i32,
+health: i32,
+immunity_frames: f32,
 
 pub fn init(models: *std.ArrayList(rl.Model), animations: *std.ArrayList(*rl.ModelAnimation)) !Self {
     var animation_count: usize = 0;
     const player_animations = rl.LoadModelAnimations("assets/player.glb", @ptrCast(&animation_count));
     const self = Self{
+        .alive = true,
         .model = rl.LoadModel("assets/player.glb"),
         .sprint_animation = player_animations[38],
         .idle_animation = player_animations[9],
         .attack_animation = player_animations[41],
         .current_animation = player_animations[9],
+        .die_animation = player_animations[4],
         .animation_counter = 0,
         .position = c.vec2(0, 0),
-        .radius = 0.1,
+        .radius = 0.2,
         .angle = 0.00,
         .speed = 3.00,
+        .health = 100,
         .is_attacking = false,
+        .immunity_frames = 0.0,
     };
 
     try models.append(self.model);
@@ -42,6 +50,17 @@ pub fn init(models: *std.ArrayList(rl.Model), animations: *std.ArrayList(*rl.Mod
 
 pub fn update(self: *Self) void {
     const delta = rl.GetFrameTime();
+
+    if (!self.alive) {
+        if (self.animation_counter < self.current_animation.frameCount - 1) {
+            self.animation_counter += 1;
+            rl.UpdateModelAnimation(self.model, self.current_animation, self.animation_counter);
+        }
+        return;
+    }
+    std.debug.print("{}\n", .{self.immunity_frames});
+    if( self.immunity_frames > 0 ) self.immunity_frames -= delta;
+
     if (!self.is_attacking) {
         var movement = rl.Vector2Zero();
         if (rl.IsKeyDown(rl.KEY_D) or rl.IsKeyDown(rl.KEY_RIGHT)) {
@@ -108,5 +127,17 @@ fn attack(self: *Self) void {
                 e.inertia = rl.Vector2Scale(c.vec2(rl.cosf(angl), rl.sinf(angl)), 0.8);
             }
         }
+    }
+}
+
+pub fn take_hit(self: *Self, dmg: i32) void {
+    if (self.alive and self.immunity_frames <= 0) {
+        self.health = self.health - dmg;
+        if (self.health <= 0) {
+            self.alive = false;
+            self.animation_counter = 0;
+            self.current_animation = self.die_animation;
+        }
+        self.immunity_frames = 2;
     }
 }

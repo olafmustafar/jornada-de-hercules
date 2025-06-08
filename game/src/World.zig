@@ -156,7 +156,7 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
             .active = true,
             .health_points = 100 * e.enemy.health,
             .pos = vec2(@floatFromInt(e.pos.x), @floatFromInt(e.pos.y)),
-            .radius = 0.1,
+            .radius = 0.3,
             .animation_frame = 0,
             .inertia = rl.Vector2Zero(),
         });
@@ -233,16 +233,15 @@ pub fn update(self: *Self) void {
 
     if (self.curr_room) |curr_room| {
         for (self.enemies.items) |*e| {
-            if (!e.alive)
-                continue;
-
-            if (!rl.CheckCollisionPointRec(e.pos, curr_room))
+            if (!e.alive or !rl.CheckCollisionPointRec(e.pos, curr_room))
                 continue;
 
             if (rl.Vector2Equals(e.inertia, rl.Vector2Zero()) == 0) {
                 e.pos = rl.Vector2Add(e.pos, e.inertia);
                 e.pos = self.solve_collisions(e.pos, e.radius);
                 e.inertia = rl.Vector2Scale(e.inertia, 0.5);
+            } else if (rl.CheckCollisionCircles(self.player.position, self.player.radius, e.pos, e.radius)) {
+                self.player.take_hit(@intFromFloat(e.enemy.damage * 50));
             } else {
                 const previous = e.pos;
                 e.pos = rl.Vector2MoveTowards(e.pos, self.player.position, 5 * e.enemy.velocity * delta);
@@ -258,16 +257,6 @@ pub fn update(self: *Self) void {
 }
 
 pub fn render(self: Self) void {
-    // debug draw
-    // rl.BeginDrawing();
-    // defer rl.EndDrawing();
-    // rl.ClearBackground(rl.DARKGRAY);
-    // for (self.collidable_tiles.items) |pos| {
-    //     const rec = rl.Rectangle{ .x = 10 * (pos.x - 0.5), .y = 10 * (pos.y - 0.5), .width = 10, .height = 10 };
-    //     rl.DrawRectangleRec(rec, rl.RED);
-    // }
-    // rl.DrawCircleV(rl.Vector2Scale(self.player.position, 10), self.player.radius * 10, rl.WHITE);
-
     rl.BeginDrawing();
     rl.BeginMode3D(self.camera);
     {
@@ -296,16 +285,16 @@ pub fn render(self: Self) void {
             rl.DrawModelEx(e.model, to_world_pos(e.pos), vec3(0, 1, 0), e.angle, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
         }
 
-        rl.DrawModelEx(self.player.model, to_world_pos(self.player.position), vec3(0, 1, 0), self.player.angle, rl.Vector3Scale(rl.Vector3One(), 0.5), rl.WHITE);
-        rl.DrawSphere(self.light.position, 0.15, rl.YELLOW);
-        rl.DrawGrid(255, 0.9);
+        rl.DrawModelEx(
+            self.player.model,
+            to_world_pos(self.player.position),
+            vec3(0, 1, 0),
+            self.player.angle,
+            rl.Vector3Scale(rl.Vector3One(), 0.5),
+            if (@mod(self.player.immunity_frames, 0.5) > 0.25 or self.player.immunity_frames <= 0) rl.WHITE else rl.RED,
+        );
 
-        // const angldeg = self.player.angle;
-        // const angl = (angldeg - 90) * -rl.DEG2RAD;
-        // const hit_radius = 0.5;
-        // const circ = rl.Vector2Add(self.player.position, rl.Vector2Scale(vec2(rl.cosf(angl), rl.sinf(angl)), hit_radius));
-        // rl.DrawSphere(to_world_pos(circ), 0.3, rl.RED);
-        // rl.DrawSphere(to_world_pos(self.player.position), 0.3, rl.RED);
+        rl.DrawSphere(self.light.position, 0.15, rl.YELLOW);
     }
     rl.EndMode3D();
     rl.EndDrawing();
@@ -334,21 +323,22 @@ fn solve_collisions(self: *Self, circ: rl.Vector2, radius: f32) rl.Vector2 {
 }
 
 fn solve_collisions_impl(circ: rl.Vector2, radius: f32, tiles: std.ArrayList(rl.Vector2)) rl.Vector2 {
+    const r = radius;
     var res = circ;
     for (tiles.items) |pos| {
         const rec = rl.Rectangle{ .x = pos.x - 0.5, .y = pos.y - 0.5, .width = 1, .height = 1 };
-        if (rl.CheckCollisionCircleRec(circ, radius, rec)) {
+        if (rl.CheckCollisionCircleRec(circ, r, rec)) {
             const a = vec2(rec.x, rec.y); //upper coner
             const b = vec2(rec.x + rec.width, rec.y + rec.height); //lower corner
 
             if (circ.x < a.x and circ.y > a.y and circ.y < b.y) {
-                res.x = a.x - radius;
-            } else if (circ.x > b.x and circ.y > a.y and circ.y < b.y) {
-                res.x = b.x + radius;
+                res.x = a.x - r;
+            } else if (circ.x + r > b.x and circ.y > a.y and circ.y < b.y) {
+                res.x = b.x + r;
             } else if (circ.y < a.y and circ.x > a.x and circ.x < b.x) {
-                res.y = a.y - radius;
-            } else if (circ.y > b.y and circ.x > a.x and circ.x < b.x) {
-                res.y = b.y + radius;
+                res.y = a.y - r;
+            } else if (circ.y + r > b.y and circ.x > a.x and circ.x < b.x) {
+                res.y = b.y + r;
             }
         }
     }
