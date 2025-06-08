@@ -1,5 +1,6 @@
 const std = @import("std");
 const rl = @import("raylib.zig");
+const World = @import("World.zig");
 const c = @import("commons.zig");
 
 const Self = @This();
@@ -73,6 +74,9 @@ pub fn update(self: *Self) void {
 
     if (self.is_attacking) {
         self.animation_counter += 2;
+        if (self.animation_counter == 12) {
+            self.attack();
+        }
         rl.UpdateModelAnimation(self.model, self.current_animation, self.animation_counter);
         if (self.animation_counter >= self.current_animation.frameCount) {
             self.is_attacking = false;
@@ -83,6 +87,26 @@ pub fn update(self: *Self) void {
         rl.UpdateModelAnimation(self.model, self.current_animation, self.animation_counter);
         if (self.animation_counter >= self.current_animation.frameCount) {
             self.animation_counter = 0;
+        }
+    }
+}
+
+fn attack(self: *Self) void {
+    const angl = (self.angle - 90) * -rl.DEG2RAD;
+    const hit_radius = 0.3;
+    const hit_circle = rl.Vector2Add(self.position, rl.Vector2Scale(c.vec2(rl.cosf(angl), rl.sinf(angl)), 0.5));
+
+    const world = World.get();
+    for (world.enemies.items) |*e| {
+        if (rl.CheckCollisionCircles(hit_circle, hit_radius, e.pos, e.radius) or
+            rl.CheckCollisionCircles(self.position, hit_radius, e.pos, e.radius))
+        {
+            e.health_points -= 10;
+            if (e.health_points <= 0) {
+                e.alive = false;
+            } else {
+                e.inertia = rl.Vector2Scale(c.vec2(rl.cosf(angl), rl.sinf(angl)), 0.8);
+            }
         }
     }
 }

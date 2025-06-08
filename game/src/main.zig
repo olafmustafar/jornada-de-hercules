@@ -4,7 +4,7 @@ const PCGManager = @import("pcgmanager");
 
 const rl = @import("raylib.zig");
 const rll = @import("rlights.zig");
-const World = @import("World.zig").World;
+const World = @import("World.zig");
 
 const window_w = 800;
 const window_h = 600;
