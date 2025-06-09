@@ -35,6 +35,7 @@ const EnemyInstance = struct {
     animation_frame: i32,
     inertia: rl.Vector2,
     shooting_cooldown: f32,
+    flyer_move_target: ?rl.Vector2,
 };
 
 const Animations = struct {
@@ -174,6 +175,7 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
             .animation_frame = 0,
             .inertia = rl.Vector2Zero(),
             .shooting_cooldown = 0,
+            .flyer_move_target = null,
         });
     }
 
@@ -272,6 +274,20 @@ pub fn update(self: *Self) !void {
                 e.inertia = rl.Vector2Scale(e.inertia, 0.5);
             } else if (rl.CheckCollisionCircles(self.player.position, self.player.radius, e.pos, e.radius)) {
                 self.player.take_hit(@intFromFloat(e.enemy.damage * 50));
+            } else if (e.enemy.type == .flyer) {
+                const previous = e.pos;
+                if (e.flyer_move_target == null or rl.Vector2Equals(e.flyer_move_target.?, e.pos) == 1) {
+                    std.debug.print("new target\n", .{});
+                    var new_target = e.pos;
+                    const angle = @as(f32, @floatFromInt(rl.GetRandomValue(0, 360))) * rl.DEG2RAD;
+                    new_target = rl.Vector2MoveTowards(new_target, rl.Vector2Add(new_target, rl.Vector2Rotate(vec2(0, 1), angle)), 1);
+                    new_target = rl.Vector2MoveTowards(new_target, self.player.position, 1);
+                    e.flyer_move_target = self.solve_collisions(new_target, e.radius);
+                }
+
+                e.pos = rl.Vector2MoveTowards(e.pos, e.flyer_move_target.?, 5 * e.enemy.velocity * delta);
+                e.pos = self.solve_collisions(e.pos, e.radius);
+                e.angle = rl.Vector2Angle(vec2(0, 1), rl.Vector2Normalize(rl.Vector2Subtract(e.pos, previous))) * -rl.RAD2DEG;
             } else {
                 const previous = e.pos;
                 e.pos = rl.Vector2MoveTowards(e.pos, self.player.position, 5 * e.enemy.velocity * delta);
@@ -295,15 +311,14 @@ pub fn update(self: *Self) !void {
         }
     }
 
-    var new_bullets : @TypeOf(self.bullets) = .init(self.bullets.allocator);
-    for( self.bullets.items ) |e|{
-        if( !e.to_remove ){
+    var new_bullets: @TypeOf(self.bullets) = .init(self.bullets.allocator);
+    for (self.bullets.items) |e| {
+        if (!e.to_remove) {
             try new_bullets.append(e);
         }
     }
     self.bullets.deinit();
     self.bullets = new_bullets;
-
 }
 
 pub fn render(self: Self) void {
