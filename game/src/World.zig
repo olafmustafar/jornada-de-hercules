@@ -44,6 +44,11 @@ const Animations = struct {
     attack: rl.ModelAnimation,
 };
 
+const TileInstance = struct {
+    tile: Tile,
+    pos: rl.Vector2,
+};
+
 const window_w = 800;
 const window_h = 600;
 
@@ -54,11 +59,10 @@ tile_models: std.EnumArray(Tile, ?rl.Model),
 shader: rl.Shader,
 light: rll.Light,
 camera: rl.Camera3D,
-collidable_tiles: std.ArrayList(rl.Vector2),
+collidable_tiles: std.ArrayList(TileInstance),
 enemies: std.ArrayList(EnemyInstance),
 bullets: std.ArrayList(Bullet),
 bullet_model: rl.Model,
-doors: std.ArrayList(rl.Vector2),
 doors_open: bool,
 door_open: rl.Model,
 door_closed: rl.Model,
@@ -144,14 +148,11 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
     self.player = try .init(&self.models, &self.models_animations);
 
     self.collidable_tiles = .init(allocator);
-    self.doors = .init(allocator);
     for (0..self.level.tilemap.height) |y| {
         for (0..self.level.tilemap.width) |x| {
             const tile = self.level.tilemap.get(x, y);
             if (tile.is_collidable()) {
-                try self.collidable_tiles.append(vec2(@floatFromInt(x), @floatFromInt(y)));
-            } else if (tile.* == .door) {
-                try self.doors.append(vec2(@floatFromInt(x), @floatFromInt(y)));
+                try self.collidable_tiles.append(.{ .tile = tile.*, .pos = vec2(@floatFromInt(x), @floatFromInt(y)) });
             } else if (tile.* == .entrance) {
                 self.player.position = vec2(@floatFromInt(x), @floatFromInt(y));
                 self.camera.target = to_world_pos(self.player.position);
@@ -193,7 +194,10 @@ pub fn deinit(self: Self) void {
     for (self.models.items) |model| rl.UnloadModel(model);
     for (self.models_animations.items) |animations| rl.UnloadModelAnimations(animations);
     self.models.deinit();
+    self.models_animations.deinit();
+    self.collidable_tiles.deinit();
     self.enemies.deinit();
+    self.bullets.deinit();
 }
 
 pub fn update(self: *Self) !void {
@@ -277,16 +281,17 @@ pub fn update(self: *Self) !void {
             } else if (e.enemy.type == .flyer) {
                 const previous = e.pos;
                 if (e.flyer_move_target == null or rl.Vector2Equals(e.flyer_move_target.?, e.pos) == 1) {
-                    std.debug.print("new target\n", .{});
                     var new_target = e.pos;
                     const angle = @as(f32, @floatFromInt(rl.GetRandomValue(0, 360))) * rl.DEG2RAD;
-                    new_target = rl.Vector2MoveTowards(new_target, rl.Vector2Add(new_target, rl.Vector2Rotate(vec2(0, 1), angle)), 1);
-                    new_target = rl.Vector2MoveTowards(new_target, self.player.position, 1);
-                    e.flyer_move_target = self.solve_collisions(new_target, e.radius);
+                    new_target = self.solve_collisions_flyer(rl.Vector2MoveTowards(new_target, rl.Vector2Add(new_target, rl.Vector2Rotate(vec2(0, 1), angle)), 0.5), e.radius);
+                    new_target = self.solve_collisions_flyer(rl.Vector2MoveTowards(new_target, self.player.position, 0.5), e.radius);
+                    e.flyer_move_target = self.solve_collisions_flyer(new_target, e.radius);
                 }
 
+                //in case it gets stuck
+                e.flyer_move_target = rl.Vector2MoveTowards(e.flyer_move_target.?, e.pos, 0.1 * delta);
                 e.pos = rl.Vector2MoveTowards(e.pos, e.flyer_move_target.?, 5 * e.enemy.velocity * delta);
-                e.pos = self.solve_collisions(e.pos, e.radius);
+                e.pos = self.solve_collisions_flyer(e.pos, e.radius);
                 e.angle = rl.Vector2Angle(vec2(0, 1), rl.Vector2Normalize(rl.Vector2Subtract(e.pos, previous))) * -rl.RAD2DEG;
             } else {
                 const previous = e.pos;
@@ -395,25 +400,32 @@ fn to_world_pos(pos: rl.Vector2) rl.Vector3 {
     return vec3(pos.x * 0.90, 0, pos.y * 0.90);
 }
 
-fn solve_collisions(self: *Self, circ: rl.Vector2, radius: f32) rl.Vector2 {
-    const new_pos = solve_collisions_impl(circ, radius, self.collidable_tiles);
-    return if (self.doors_open) new_pos else solve_collisions_impl(new_pos, radius, self.doors);
+fn solve_collisions_flyer(self: *Self, circ: rl.Vector2, radius: f32) rl.Vector2 {
+    return self.solve_collisions_impl(circ, radius, true);
 }
 
-fn solve_collisions_impl(circ: rl.Vector2, radius: f32, tiles: std.ArrayList(rl.Vector2)) rl.Vector2 {
+fn solve_collisions(self: *Self, circ: rl.Vector2, radius: f32) rl.Vector2 {
+    return self.solve_collisions_impl(circ, radius, false);
+}
+
+fn solve_collisions_impl(self: *Self, circ: rl.Vector2, radius: f32, is_flyer: bool) rl.Vector2 {
     const r = radius;
     var res = circ;
-    for (tiles.items) |pos| {
-        const rec = rl.Rectangle{ .x = pos.x - 0.5, .y = pos.y - 0.5, .width = 1, .height = 1 };
+    for (self.collidable_tiles.items) |tile| {
+        if (self.doors_open and tile.tile == .door) continue;
+        if (is_flyer and tile.tile == .ocean) continue;
+
+        const rec = rl.Rectangle{ .x = tile.pos.x - 0.5, .y = tile.pos.y - 0.5, .width = 1, .height = 1 };
         if (rl.CheckCollisionCircleRec(circ, r, rec)) {
             const a = vec2(rec.x, rec.y); //upper coner
             const b = vec2(rec.x + rec.width, rec.y + rec.height); //lower corner
 
-            if (circ.x < a.x and circ.y > a.y and circ.y < b.y) {
+            if (circ.x - r < a.x and circ.y > a.y and circ.y < b.y) {
                 res.x = a.x - r;
             } else if (circ.x + r > b.x and circ.y > a.y and circ.y < b.y) {
                 res.x = b.x + r;
-            } else if (circ.y < a.y and circ.x > a.x and circ.x < b.x) {
+            }
+            if (circ.y - r < a.y and circ.x > a.x and circ.x < b.x) {
                 res.y = a.y - r;
             } else if (circ.y + r > b.y and circ.x > a.x and circ.x < b.x) {
                 res.y = b.y + r;

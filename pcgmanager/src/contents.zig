@@ -77,7 +77,8 @@ pub const Tile = enum {
         return tile == .mountain or
             tile == .trees or
             tile == .ocean or
-            tile == .wall;
+            tile == .wall or
+            tile == .door;
     }
 };
 

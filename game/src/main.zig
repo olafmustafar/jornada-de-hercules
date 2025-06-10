@@ -33,6 +33,7 @@ pub fn main() !void {
         .max_branch_diameter = 5,
         .change_direction_chance = 0.25,
     } } });
+
     const level = try pcg.retrieve_level();
     defer level.deinit();
 
