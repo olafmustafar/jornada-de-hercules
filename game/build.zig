@@ -1,8 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-pub fn compile_for_desktop(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
+pub fn compile_for_desktop(b: *std.Build, target: std.Build.ResolvedTarget) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const exe_mod = b.createModule(.{
@@ -45,7 +44,6 @@ pub fn compile_for_desktop(b: *std.Build) void {
 }
 
 pub fn compile_for_wasm(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
     if (b.sysroot == null) {
@@ -69,7 +67,11 @@ pub fn compile_for_wasm(b: *std.Build) void {
         .link_libc = true,
     });
     exe_lib.shared_memory = false;
-    exe_lib.root_module.single_threaded = false;
+    exe_lib.root_module.single_threaded = true;
+
+    const pcgmanager = b.dependency("pcgmanager", .{});
+    exe_lib.root_module.addImport("pcgmanager", pcgmanager.module("root"));
+    exe_lib.linkLibrary(pcgmanager.artifact("pcgmanager"));
 
     const raylib_dep = b.dependency("raylib", .{
         .target = wasm_target,
@@ -85,7 +87,7 @@ pub fn compile_for_wasm(b: *std.Build) void {
     dir.close();
 
     exe_lib.addIncludePath(.{ .cwd_relative = sysroot_include });
-    addAssets(b, exe_lib);
+    // addAssets(b, exe_lib);
 
     const emcc_exe_path = b.pathJoin(&.{ b.sysroot.?, "emcc" });
     const emcc_command = b.addSystemCommand(&[_][]const u8{emcc_exe_path});
@@ -126,11 +128,12 @@ pub fn compile_for_wasm(b: *std.Build) void {
     const install = emcc_command;
     b.default_step.dependOn(&install.step);
 }
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     if (target.result.cpu.arch == .wasm32) {
         compile_for_wasm(b);
     } else {
-        compile_for_desktop(b);
+        compile_for_desktop(b, target);
     }
 }

@@ -5,8 +5,8 @@
     .fingerprint = 0x232b318c5b9fedc5,
     .dependencies = .{
         .raylib = .{
-            .url = "git+https://github.com/raysan5/raylib.git#11e15ab2ac3d943b3d9bf252f47f842e65f4e821",
-            .hash = "raylib-5.5.0-whq8uP6mMwRUaBAOJg8L7n1-I0ydGOQc5bQb2jjeFlDD",
+            .url = "git+https://github.com/raysan5/raylib.git#59bcf680aafb6f054e150f70c8c71deb44ad04b1",
+            .hash = "raylib-5.5.0-whq8uB05NgRNqHhxfYQ5qz60yFcpFeERE0adE0KW7jvM",
         },
 
         .pcgmanager = .{
