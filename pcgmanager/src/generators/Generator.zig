@@ -1,7 +1,66 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const Context = @import("../Context.zig");
 
 pub fn Generator(
+    comptime InstructionType: type,
+    comptime ContentType: type,
+    comptime GenFn: *const fn (ctx: *Context, instruction: InstructionType) ContentType,
+) type {
+    comptime {
+        if (builtin.single_threaded) {
+            return GeneratorImpl(InstructionType, ContentType, GenFn);
+        } else {
+            return GeneratorMultithreadImpl(InstructionType, ContentType, GenFn);
+        }
+    }
+}
+
+pub fn GeneratorImpl(
+    comptime InstructionType: type,
+    comptime ContentType: type,
+    comptime GenFn: *const fn (ctx: *Context, instruction: InstructionType) ContentType,
+) type {
+    const Queue = std.ArrayList(InstructionType);
+
+    return struct {
+        pub const Instruction = InstructionType;
+        pub const Content = ContentType;
+
+        const Self = @This();
+
+        gen_context: *Context,
+        result: std.ArrayList(Content),
+        queue: Queue,
+
+        pub fn init(gen_context: *Context, workers: usize, alloc: std.mem.Allocator) !Self {
+            _ = workers;
+            return Self{ .queue = .init(alloc), .result = .init(alloc), .gen_context = gen_context };
+        }
+
+        pub fn deinit(self: *Self) void {
+            self.queue.deinit();
+            self.result.deinit();
+        }
+
+        pub fn add(self: *Self, instruction: Instruction) !void {
+            try self.queue.insert(0, instruction);
+        }
+
+        pub fn wait_results(self: *Self) !std.ArrayList(Content) {
+            for (self.queue.items) |instr| {
+                const content = GenFn(self.gen_context, instr);
+                try self.result.append(content);
+            }
+
+            const results = try self.result.clone();
+            self.result.clearAndFree();
+            return results;
+        }
+    };
+}
+
+pub fn GeneratorMultithreadImpl(
     comptime InstructionType: type,
     comptime ContentType: type,
     comptime GenFn: *const fn (ctx: *Context, instruction: InstructionType) ContentType,
@@ -21,7 +80,6 @@ pub fn Generator(
             thread_cv: std.Thread.Condition,
             cv: std.Thread.Condition,
             gen_context: *Context,
-
         };
 
         const Self = @This();
@@ -82,16 +140,7 @@ pub fn Generator(
         pub fn init(gen_context: *Context, workers: usize, alloc: std.mem.Allocator) !Self {
             var self = Self{ .gpa = alloc, .shared = try alloc.create(SharedContext), .workers = .init(alloc) };
 
-            self.shared.* = .{
-                .queue = .init(alloc),
-                .result = .init(alloc),
-                .should_exit = false,
-                .mutex = .{},
-                .cv = .{},
-                .thread_cv = .{},
-                .working = 0,
-                .gen_context = gen_context
-            };
+            self.shared.* = .{ .queue = .init(alloc), .result = .init(alloc), .should_exit = false, .mutex = .{}, .cv = .{}, .thread_cv = .{}, .working = 0, .gen_context = gen_context };
 
             for (0..workers) |_|
                 try self.workers.append(try std.Thread.spawn(.{}, worker_fn, .{self.shared}));

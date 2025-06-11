@@ -93,7 +93,7 @@ pub fn compile_for_wasm(b: *std.Build) void {
     const emcc_command = b.addSystemCommand(&[_][]const u8{emcc_exe_path});
     emcc_command.addArgs(&[_][]const u8{
         "-o",
-        "zig-out/web/index.html",
+        "zig-out/bin/index.html",
         "-sFULL-ES3=1",
         "-sUSE_GLFW=3",
         "-O3",
