@@ -76,7 +76,6 @@ pub fn compile_for_wasm(b: *std.Build) void {
     const raylib_dep = b.dependency("raylib", .{
         .target = wasm_target,
         .optimize = optimize,
-        .rmodels = false,
     });
     const raylib_artifact = raylib_dep.artifact("raylib");
     exe_lib.linkLibrary(raylib_artifact);
@@ -96,7 +95,7 @@ pub fn compile_for_wasm(b: *std.Build) void {
         "zig-out/bin/index.html",
         "-sFULL-ES3=1",
         "-sUSE_GLFW=3",
-        "-O3",
+        "-O2",
 
         // "-sAUDIO_WORKLET=1",
         // "-sWASM_WORKERS=1",
@@ -106,12 +105,18 @@ pub fn compile_for_wasm(b: *std.Build) void {
         // "-pthread",
         // "-sPTHREAD_POOL_SIZE=4",
 
-        "-sINITIAL_MEMORY=167772160",
+        "-sINITIAL_MEMORY=335544320",
         //"-sEXPORTED_FUNCTIONS=_main,__builtin_return_address",
 
         // USE_OFFSET_CONVERTER required for @returnAddress used in
         // std.mem.Allocator interface
         "-sUSE_OFFSET_CONVERTER",
+        "-sALLOW_MEMORY_GROWTH",
+        "-sSTACK_OVERFLOW_CHECK=2",
+        "-sSTACK_SIZE=167772160",
+
+        "--embed-file",
+        "assets",
         "--shell-file",
         b.path("src/shell.html").getPath(b),
     });

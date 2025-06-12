@@ -10,13 +10,7 @@ const window_w = 800;
 const window_h = 600;
 
 pub fn main() !void {
-    const allocator = std.heap.page_allocator;
-
-    rl.InitWindow(window_w, window_h, "raylib [core] example - basic window");
-    rl.SetTargetFPS(60);
-    rl.DisableCursor();
-    rl.SetConfigFlags(rl.FLAG_MSAA_4X_HINT);
-    defer rl.CloseWindow();
+    const allocator = std.heap.c_allocator;
 
     var pcg = try PCGManager.init(allocator);
     try pcg.generate(.{ .room = .{ .generate = .{} } });
@@ -37,6 +31,12 @@ pub fn main() !void {
     const level = try pcg.retrieve_level();
     defer level.deinit();
 
+    rl.SetConfigFlags(rl.FLAG_MSAA_4X_HINT);
+    rl.InitWindow(window_w, window_h, "raylib [core] example - basic window");
+    rl.SetTargetFPS(60);
+    rl.DisableCursor();
+    defer rl.CloseWindow();
+
     var world = try World.init(allocator, level);
 
     while (!rl.WindowShouldClose()) {
@@ -44,3 +44,4 @@ pub fn main() !void {
         world.render();
     }
 }
+

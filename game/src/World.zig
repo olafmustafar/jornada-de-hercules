@@ -335,6 +335,7 @@ pub fn render(self: Self) void {
         defer rl.EndMode3D();
 
         rl.ClearBackground(rl.DARKGRAY);
+        std.debug.print("rendering\n", .{});
 
         for (0..self.level.tilemap.height) |y| {
             for (0..self.level.tilemap.width) |x| {
