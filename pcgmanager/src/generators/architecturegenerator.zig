@@ -48,6 +48,7 @@ fn reset_state(ctx: *Context, architecture: *Architecture, position_set: *std.Au
     try architecture.append(Node{
         .directions = .initDefault(false, .{ .down = true }),
         .entrance = .down,
+        .exit = null,
         .pos = .init(0, 0),
         .is_branch = false,
         .difficulty_class = ctx.difficulty_level - 1,
@@ -107,11 +108,22 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
             continue;
         }
 
+        var exit: ?Direction = null;
+        if (!expand.is_branch and expand.diameter_left - 1 == 0) {
+            exit = choose_random_available_direction(rnd, origin.pos, &origin.directions, position_set, expand.direction);
+            if (exit == null) {
+                count = 0;
+                try reset_state(ctx, &architecture, &position_set, &expand_queue, args.diameter);
+            }
+            continue;
+        }
+
         const dir = dir_opt.?;
         origin.directions.set(dir, true);
         var new_node = Node{
             .pos = origin.pos.move(dir),
             .directions = .initDefault(false, .{}),
+            .exit = exit,
             .entrance = null,
             .is_branch = expand.is_branch,
             .difficulty_class = if (@as(f32, @floatFromInt(expand.diameter_left)) > (@as(f32, @floatFromInt(args.diameter)) * 0.6))

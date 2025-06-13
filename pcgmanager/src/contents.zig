@@ -164,3 +164,5 @@ pub const Level = struct {
     room_rects: std.ArrayList(Rect),
     enemies: std.ArrayList(EnemyLocation),
 };
+
+pub const Levels = std.ArrayList(Level);
