@@ -114,6 +114,8 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
             if (exit == null) {
                 count = 0;
                 try reset_state(ctx, &architecture, &position_set, &expand_queue, args.diameter);
+            } else {
+                position_set.put(origin.pos.move(exit));
             }
             continue;
         }

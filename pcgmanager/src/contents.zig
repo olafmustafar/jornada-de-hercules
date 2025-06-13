@@ -119,6 +119,10 @@ const Tilemap = struct {
         self.gpa.free(self.data);
     }
 
+    pub fn set(self: Tilemap, x: usize, y: usize, tile: Tile) void {
+        self.get(x, y).* = tile;
+    }
+
     pub fn get(self: Tilemap, x: usize, y: usize) *Tile {
         return &self.data[(y * self.width) + x];
     }
@@ -143,6 +147,18 @@ pub const Enemy = struct {
 pub const EnemiesPerDifficulty = std.ArrayList(std.EnumArray(Enemy.Type, Enemy));
 
 pub const Rect = struct { x: f32, y: f32, w: f32, h: f32 };
+
+pub const PlaceholderTag = enum{
+    player,
+    enemy,
+};
+
+pub const Placeholder = union(PlaceholderTag) {
+    player: void,
+    exit: void,
+    enemy: Enemy,
+    //TODO items, npcs, exits
+};
 
 pub const Level = struct {
     pub const EnemyLocation = struct { pos: Position, enemy: Enemy };
