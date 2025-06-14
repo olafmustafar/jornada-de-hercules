@@ -30,6 +30,9 @@ pub fn main() !void {
 
     const level = try pcg.retrieve_level();
     defer level.deinit();
+    defer for (level.items) |l| {
+        l.deinit();
+    };
 
     rl.SetConfigFlags(rl.FLAG_MSAA_4X_HINT);
     rl.InitWindow(window_w, window_h, "raylib [core] example - basic window");
@@ -37,7 +40,7 @@ pub fn main() !void {
     rl.DisableCursor();
     defer rl.CloseWindow();
 
-    var world = try World.init(allocator, level);
+    var world = try World.init(allocator, level.items[0]);
 
     while (!rl.WindowShouldClose()) {
         try world.update();

@@ -54,9 +54,8 @@ pub fn generate(self: *Self, instruction: Instruction) !void {
     };
 }
 
-pub fn retrieve_level(self: *Self) !Contents.Level {
-    const rooms = try self.room_generator.wait_results();
-    defer rooms.deinit();
+pub fn retrieve_level(self: *Self) !Contents.Levels {
+    const rooms = try self.room_generator.wait_results(); defer rooms.deinit();
     for (rooms.items) |room| {
         try self.orquestrator.add(.{ .room = room });
     }

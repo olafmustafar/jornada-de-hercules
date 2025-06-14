@@ -114,7 +114,6 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
         .ocean = rl.LoadModel("assets/ocean_sqr.glb"),
         .wall = rl.LoadModel("assets/wall_sqr.glb"),
         .door = null,
-        .entrance = null,
         .size = null,
     });
 
@@ -151,33 +150,39 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
     for (0..self.level.tilemap.height) |y| {
         for (0..self.level.tilemap.width) |x| {
             const tile = self.level.tilemap.get(x, y);
-            if (tile.is_collidable()) {
+            if (tile.is_collidable())
                 try self.collidable_tiles.append(.{ .tile = tile.*, .pos = vec2(@floatFromInt(x), @floatFromInt(y)) });
-            } else if (tile.* == .entrance) {
-                self.player.position = vec2(@floatFromInt(x), @floatFromInt(y));
-                self.camera.target = to_world_pos(self.player.position);
-            }
         }
     }
 
     self.enemies = .init(allocator);
-
-    for (self.level.enemies.items) |e| {
-        try self.enemies.append(EnemyInstance{
-            .alive = true,
-            .model = self.enemy_models.get(e.enemy.type).?,
-            .animation = self.enemy_animations.get(e.enemy.type).?.run,
-            .angle = 0.0,
-            .enemy = e.enemy,
-            .active = true,
-            .health_points = 100 * e.enemy.health,
-            .pos = vec2(@floatFromInt(e.pos.x), @floatFromInt(e.pos.y)),
-            .radius = 0.3,
-            .animation_frame = 0,
-            .inertia = rl.Vector2Zero(),
-            .shooting_cooldown = 0,
-            .flyer_move_target = null,
-        });
+    for (self.level.placeholders.items) |ph| {
+        switch (ph.entity) {
+            .enemy => |enemy| {
+                try self.enemies.append(EnemyInstance{
+                    .alive = true,
+                    .model = self.enemy_models.get(enemy.type).?,
+                    .animation = self.enemy_animations.get(enemy.type).?.run,
+                    .angle = 0.0,
+                    .enemy = enemy,
+                    .active = true,
+                    .health_points = 100 * enemy.health,
+                    .pos = vec2(@floatFromInt(ph.position.x), @floatFromInt(ph.position.y)),
+                    .radius = 0.3,
+                    .animation_frame = 0,
+                    .inertia = rl.Vector2Zero(),
+                    .shooting_cooldown = 0,
+                    .flyer_move_target = null,
+                });
+            },
+            .player => {
+                self.player.position = vec2(@floatFromInt(ph.position.x), @floatFromInt(ph.position.y));
+                self.camera.target = to_world_pos(self.player.position);
+            },
+            .exit => {},
+            .npc => {},
+            .item => {},
+        }
     }
 
     for (self.enemies.items) |enemy|

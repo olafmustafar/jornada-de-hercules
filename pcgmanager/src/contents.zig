@@ -43,7 +43,6 @@ pub const Tile = enum {
     ocean,
     wall,
     door,
-    entrance,
     size,
 
     const chars = std.EnumMap(Tile, u8).init(.{
@@ -55,7 +54,6 @@ pub const Tile = enum {
         .trees = 'T',
         .wall = '#',
         .door = 'd',
-        .entrance = '@',
         .size = 'X',
     });
 
@@ -85,24 +83,41 @@ pub const Tile = enum {
 pub const Room = struct {
     pub const Placeholder = struct { pos: Position, type: Enemy.Type };
     tilemap: [8][12]Tile,
-    enemies: std.ArrayList(Placeholder),
+    enemies: std.ArrayList(Room.Placeholder),
 };
 
 pub const Node = struct {
     pos: Position,
     directions: std.EnumArray(Direction, bool),
     is_branch: bool,
-    entrance: ?Direction,
+    is_spawn: bool,
+    exit: ?Direction,
     difficulty_class: usize,
 };
 
 pub const Architecture = std.ArrayList(Node);
 
-const Tilemap = struct {
+pub const Tilemap = struct {
     data: []Tile,
     width: usize,
     height: usize,
     gpa: std.mem.Allocator,
+
+    pub fn from_string(alloc: std.mem.Allocator, string: []const u8) !Tilemap {
+        var it = std.mem.splitSequence(u8, string, "\n");
+        const cols = it.peek().?.len;
+        const rows = it.buffer.len / cols;
+        var self = try Tilemap.init(alloc, cols, rows);
+
+        var y: usize = 0;
+        while (it.next()) |line| {
+            for (line, 0..) |c, x| {
+                self.set(x, y, Tile.from_char(c));
+            }
+            y += 1;
+        }
+        return self;
+    }
 
     pub fn init(alloc: std.mem.Allocator, width: usize, height: usize) !Tilemap {
         const self = Tilemap{
@@ -144,20 +159,33 @@ pub const Enemy = struct {
     shooting_velocity: f32,
 };
 
+pub const Npc = struct {
+    name: []const u8,
+    dialog: []const u8,
+};
+
 pub const EnemiesPerDifficulty = std.ArrayList(std.EnumArray(Enemy.Type, Enemy));
 
 pub const Rect = struct { x: f32, y: f32, w: f32, h: f32 };
 
-pub const PlaceholderTag = enum{
+pub const PlaceholderTag = enum {
     player,
+    exit,
     enemy,
+    item,
+    npc,
 };
 
-pub const Placeholder = union(PlaceholderTag) {
-    player: void,
-    exit: void,
-    enemy: Enemy,
-    //TODO items, npcs, exits
+pub const Placeholder = struct {
+    position: Position,
+    entity: union(PlaceholderTag) {
+        player: void,
+        exit: void,
+        enemy: Enemy,
+        item: void,
+        npc: Npc,
+        //TODO items, npcs, exits
+    },
 };
 
 pub const Level = struct {
@@ -167,18 +195,19 @@ pub const Level = struct {
         return .{
             .tilemap = try .init(alloc, width, height),
             .room_rects = .init(alloc),
-            .enemies = .init(alloc),
+            .placeholders = .init(alloc),
         };
     }
+
     pub fn deinit(self: Level) void {
         self.tilemap.deinit();
         self.room_rects.deinit();
-        self.enemies.deinit();
+        self.placeholders.deinit();
     }
 
     tilemap: Tilemap,
     room_rects: std.ArrayList(Rect),
-    enemies: std.ArrayList(EnemyLocation),
+    placeholders: std.ArrayList(Placeholder),
 };
 
 pub const Levels = std.ArrayList(Level);

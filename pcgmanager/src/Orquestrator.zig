@@ -11,17 +11,6 @@ const Tile = contents.Tile;
 const Node = contents.Node;
 const EnemiesPerDifficulty = contents.EnemiesPerDifficulty;
 
-const spawn =
-    \\............
-    \\.####..####.
-    \\.#........#.
-    \\.#...@....#.
-    \\.#........#.
-    \\.#........#.
-    \\.##########.
-    \\............
-;
-
 const Self = @This();
 
 const ContentTag = enum {
@@ -40,6 +29,17 @@ rooms: std.ArrayList(Room),
 enemies_per_difficulty: ?EnemiesPerDifficulty,
 architectures: std.ArrayList(Architecture),
 gpa: std.mem.Allocator,
+
+const spawn_tilemap =
+    \\   #....#   
+    \\   #....#   
+    \\   #....#   
+    \\   ######   
+    \\            
+    \\            
+    \\            
+    \\            
+;
 
 pub fn init(alloc: std.mem.Allocator) Self {
     return .{ .rooms = .init(alloc), .architectures = .init(alloc), .enemies_per_difficulty = null, .gpa = alloc };
@@ -94,17 +94,29 @@ pub fn combine(self: *Self) !Levels {
                 .h = room_h + 1,
             });
 
+            if (node.is_spawn) {
+                var tilemap = try Tilemap.from_string(self.gpa, spawn_tilemap);
+                defer tilemap.deinit();
+                try level.placeholders.append(.{ .position = .init(@as(i32, @intCast(x)) + 5, @as(i32, @intCast(y)) + 2), .entity = .{ .player = {} } });
+                for (0..tilemap.width) |rx| {
+                    for (0..tilemap.height) |ry| {
+                        level.tilemap.set(x + rx + 1, y + ry + 1, tilemap.get(rx, ry).*);
+                    }
+                }
+                continue;
+            }
+
             for (0..(room_w + 2)) |i| {
                 const up = level.tilemap.get(x + i, y);
                 const down = level.tilemap.get(x + i, y + room_h + 1);
                 if (tile_is_central(i, room_w)) {
                     if (node.directions.get(.up)) {
-                        up.* = if (node.entrance == .up) .entrance else .door;
+                        up.* = .door;
                     } else {
                         up.* = .wall;
                     }
                     if (node.directions.get(.down)) {
-                        down.* = if (node.entrance == .down) .entrance else .door;
+                        down.* = .door;
                     } else {
                         down.* = .wall;
                     }
@@ -119,13 +131,13 @@ pub fn combine(self: *Self) !Levels {
                 const right = level.tilemap.get(x + room_w + 1, y + i);
                 if (tile_is_central(i, room_h)) {
                     if (node.directions.get(.left)) {
-                        left.* = if (node.entrance == .left) .entrance else .door;
+                        left.* = .door;
                     } else {
                         left.* = .wall;
                     }
 
                     if (node.directions.get(.right)) {
-                        right.* = if (node.entrance == .right) .entrance else .door;
+                        right.* = .door;
                     } else {
                         right.* = .wall;
                     }
@@ -144,19 +156,19 @@ pub fn combine(self: *Self) !Levels {
 
             for (room.enemies.items) |placeholder| {
                 const enemies = &enemies_per_difficulty.items[node.difficulty_class];
-                try level.enemies.append(.{
-                    .pos = .{
+                try level.placeholders.append(.{
+                    .position = .{
                         .x = placeholder.pos.x + @as(i32, @intCast(x)) + 1,
                         .y = placeholder.pos.y + @as(i32, @intCast(y)) + 1,
                     },
-                    .enemy = enemies.get(placeholder.type),
+                    .entity = .{ .enemy = enemies.get(placeholder.type) },
                 });
             }
 
             room_idx = (room_idx + 1) % self.rooms.items.len;
         }
 
-        levels.append(level);
+        try levels.append(level);
     }
 
     return levels;
