@@ -3,44 +3,46 @@ const Level = @import("pcgmanager").Contents.Level;
 const Tile = @import("pcgmanager").Contents.Tile;
 
 const spawn =
-    \\######@@#######
-    \\#.............#
-    \\#.............#
-    \\#.............#
-    \\######@@#######
-    \\..T..........T.
-    \\............T..
-    \\....T..........
-    \\.............T.
-    \\..T.......T....
-    \\...............
-    \\...............
+    \\TTTTTTTTT#..#TTTTTTTTT
+    \\TTTTTTTTT#..#TTTTTTTTT
+    \\TTTTTTTTT#..#TTTTTTTTT
+    \\TTTTTTTTT#..#TTTTTTTTT
+    \\TTTT######dd######TTTT
+    \\TTTT#............#TTTT
+    \\TTTT#............#TTTT
+    \\TTTT#............#TTTT
+    \\TTTT#............#TTTT
+    \\TTTT######dd######TTTT
+    \\TTT...T.........TTTTTT
+    \\TTTTT............TTTTT
+    \\TTT.....T.........TTTT
+    \\TTTT............T.TTTT
+    \\TTTT.TT.......T.TTTTTT
+    \\TTT...............TTTT
+    \\TTTT................TT
+    \\TTT...TT.T....T.TT.TTT
+    \\TTTTTTTTTT..TTTTTTTTTT
+    \\TTTTTTTTTT.TTTTTTTTTTT
+    \\TTTTTTTTTTTTTTTTTTTTTT
+    \\TTTTTTTTTTTTTTTTTTTTTT
 ;
 
 pub fn initial_scene(alloc: std.mem.Allocator) !Level {
-    var level = try Level.init(alloc, 14, 12);
+    var level = try Level.from_string(alloc, spawn);
 
-    var it = std.mem.splitSequence(u8, spawn, "\n");
-    var y = 0;
-    while (it.next()) |line| {
-        for (line, 0..) |char, x| {
-            level.tilemap.set(x, y, Tile.from_char(char));
-        }
-        y += 1;
-    }
+    try level.placeholders.append(.{ .position = .init(10, 14), .entity = .{ .player = {} } });
 
-    level.placeholders.append(.{ .position = .init(6, 10), .entity = .{ .player = {} } });
-
-    level.placeholders.append(.{ .position = .init(4, 2), .entity = .{ .npc = .{
+    try level.placeholders.append(.{ .position = .init(8, 5), .entity = .{ .npc = .{
         .name = "Urubu",
         .dialog = "Olá Hercúles",
     } } });
 
-    level.placeholders.append(.{ .position = .init(10, 2), .entity = .{ .item = {} } });
+    try level.placeholders.append(.{ .position = .init(13, 5), .entity = .{ .item = {} } });
+    try level.placeholders.append(.{ .position = .init(10, 2), .entity = .{ .exit = .up } });
+    try level.placeholders.append(.{ .position = .init(11, 2), .entity = .{ .exit = .up } });
 
-    level.placeholders.append(.{ .position = .init(6, 0), .entity = .{ .exit = {} } });
+    try level.room_rects.append(.{ .x = 4, .y = 4, .w = 14, .h = 6 });
+    try level.room_rects.append(.{ .x = 4, .y = 10, .w =14, .h = 8 });
 
-    level.placeholders.append(.{ .position = .init(7, 0), .entity = .{ .exit = {} } });
-
-    level.room_rects.append(.{ .x = 0, .y = 0, .w = 15, .h = 5 });
+    return level;
 }

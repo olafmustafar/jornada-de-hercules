@@ -5,14 +5,15 @@ const PCGManager = @import("pcgmanager");
 const rl = @import("raylib.zig");
 const rll = @import("rlights.zig");
 const World = @import("World.zig");
+const scenes = @import("scenes.zig");
 
 const window_w = 800;
 const window_h = 600;
 
 pub fn main() !void {
-    const allocator = std.heap.c_allocator;
+    const alloc = std.heap.c_allocator;
 
-    var pcg = try PCGManager.init(allocator);
+    var pcg = try PCGManager.init(alloc);
     try pcg.generate(.{ .room = .{ .generate = .{} } });
     try pcg.generate(.{ .room = .{ .generate = .{} } });
     try pcg.generate(.{ .room = .{ .generate = .{} } });
@@ -40,11 +41,13 @@ pub fn main() !void {
     rl.DisableCursor();
     defer rl.CloseWindow();
 
-    var world = try World.init(allocator, level.items[0]);
+    const initial = try scenes.initial_scene(alloc);
+    defer initial.deinit();
+
+    var world = try World.init(alloc, initial);
 
     while (!rl.WindowShouldClose()) {
         try world.update();
         world.render();
     }
 }
-

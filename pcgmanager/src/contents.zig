@@ -180,7 +180,7 @@ pub const Placeholder = struct {
     position: Position,
     entity: union(PlaceholderTag) {
         player: void,
-        exit: void,
+        exit: Direction,
         enemy: Enemy,
         item: void,
         npc: Npc,
@@ -190,6 +190,14 @@ pub const Placeholder = struct {
 
 pub const Level = struct {
     pub const EnemyLocation = struct { pos: Position, enemy: Enemy };
+
+    pub fn from_string(alloc: std.mem.Allocator, string: []const u8) !Level {
+        return .{
+            .tilemap = try .from_string(alloc, string),
+            .room_rects = .init(alloc),
+            .placeholders = .init(alloc),
+        };
+    }
 
     pub fn init(alloc: std.mem.Allocator, width: usize, height: usize) !Level {
         return .{
