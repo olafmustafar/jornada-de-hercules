@@ -110,16 +110,8 @@ pub fn combine(self: *Self) !Levels {
                 const up = level.tilemap.get(x + i, y);
                 const down = level.tilemap.get(x + i, y + room_h + 1);
                 if (tile_is_central(i, room_w)) {
-                    if (node.directions.get(.up)) {
-                        up.* = .door;
-                    } else {
-                        up.* = .wall;
-                    }
-                    if (node.directions.get(.down)) {
-                        down.* = .door;
-                    } else {
-                        down.* = .wall;
-                    }
+                    up.* = if (node.directions.get(.up)) .door else .wall;
+                    down.* = if (node.directions.get(.down)) .door else .wall;
                 } else {
                     up.* = .wall;
                     down.* = .wall;
@@ -130,17 +122,8 @@ pub fn combine(self: *Self) !Levels {
                 const left = level.tilemap.get(x, y + i);
                 const right = level.tilemap.get(x + room_w + 1, y + i);
                 if (tile_is_central(i, room_h)) {
-                    if (node.directions.get(.left)) {
-                        left.* = .door;
-                    } else {
-                        left.* = .wall;
-                    }
-
-                    if (node.directions.get(.right)) {
-                        right.* = .door;
-                    } else {
-                        right.* = .wall;
-                    }
+                    left.* = if (node.directions.get(.left)) .door else .wall;
+                    right.* = if (node.directions.get(.right)) .door else .wall;
                 } else {
                     left.* = .wall;
                     right.* = .wall;
@@ -163,6 +146,29 @@ pub fn combine(self: *Self) !Levels {
                     },
                     .entity = .{ .enemy = enemies.get(placeholder.type) },
                 });
+            }
+
+            if (node.exit) |exit_dir| {
+                const x_i32: i32 = @intCast(x);
+                const y_i32: i32 = @intCast(y);
+                switch (exit_dir) {
+                    .up => {
+                        try level.placeholders.append(.{ .position = .init(x_i32 + (room_w / 2), y_i32), .entity = .{ .exit = exit_dir } });
+                        try level.placeholders.append(.{ .position = .init(x_i32 + (room_w / 2) + 1, y_i32), .entity = .{ .exit = exit_dir } });
+                    },
+                    .down => {
+                        try level.placeholders.append(.{ .position = .init(x_i32 + (room_w / 2), y_i32 + room_h), .entity = .{ .exit = exit_dir } });
+                        try level.placeholders.append(.{ .position = .init(x_i32 + (room_w / 2) + 1, y_i32 + room_h), .entity = .{ .exit = exit_dir } });
+                    },
+                    .left => {
+                        try level.placeholders.append(.{ .position = .init(x_i32, y_i32 + (room_h / 2)), .entity = .{ .exit = exit_dir } });
+                        try level.placeholders.append(.{ .position = .init(x_i32, y_i32 + (room_h / 2) + 1), .entity = .{ .exit = exit_dir } });
+                    },
+                    .right => {
+                        try level.placeholders.append(.{ .position = .init(x_i32 + room_w, y_i32 + (room_h / 2)), .entity = .{ .exit = exit_dir } });
+                        try level.placeholders.append(.{ .position = .init(x_i32 + room_w, y_i32 + (room_h / 2) + 1), .entity = .{ .exit = exit_dir } });
+                    },
+                }
             }
 
             room_idx = (room_idx + 1) % self.rooms.items.len;

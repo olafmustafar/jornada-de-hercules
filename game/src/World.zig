@@ -4,6 +4,7 @@ const PCGManager = @import("pcgmanager");
 const Tile = PCGManager.Contents.Tile;
 const Level = PCGManager.Contents.Level;
 const Enemy = PCGManager.Contents.Enemy;
+const Direction = PCGManager.Contents.Direction;
 
 const commons = @import("commons.zig");
 const vec2 = commons.vec2;
@@ -49,6 +50,11 @@ const TileInstance = struct {
     pos: rl.Vector2,
 };
 
+const Exit = struct {
+    pos: rl.Vector2,
+    dir: Direction,
+};
+
 const window_w = 800;
 const window_h = 600;
 
@@ -62,6 +68,7 @@ camera: rl.Camera3D,
 collidable_tiles: std.ArrayList(TileInstance),
 enemies: std.ArrayList(EnemyInstance),
 bullets: std.ArrayList(Bullet),
+exits: std.ArrayList(Exit),
 bullet_model: rl.Model,
 doors_open: bool,
 door_open: rl.Model,
@@ -79,7 +86,7 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
     self.level = level;
     self.models = std.ArrayList(rl.Model).init(allocator);
     self.models_animations = .init(allocator);
-
+    self.exits = .init(allocator);
     self.bullets = .init(allocator);
     self.bullet_model = rl.LoadModel("assets/bullet.glb");
     try self.models.append(self.bullet_model);
@@ -179,7 +186,9 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
                 self.player.position = vec2(@floatFromInt(ph.position.x), @floatFromInt(ph.position.y));
                 self.camera.target = to_world_pos(self.player.position);
             },
-            .exit => {},
+            .exit => |exit| {
+                try self.exits.append(.{ .dir = exit, .pos = vec2(@floatFromInt(ph.position.x), @floatFromInt(ph.position.y)) });
+            },
             .npc => {},
             .item => {},
         }
@@ -203,6 +212,7 @@ pub fn deinit(self: Self) void {
     self.collidable_tiles.deinit();
     self.enemies.deinit();
     self.bullets.deinit();
+    self.exits.deinit();
 }
 
 pub fn update(self: *Self) !void {
@@ -227,7 +237,7 @@ pub fn update(self: *Self) !void {
     const dist = rl.Vector3Distance(self.camera.target, to_world_pos(center));
     self.camera.target = rl.Vector3MoveTowards(self.camera.target, to_world_pos(center), rl.logf(dist + 1.1) * 0.1);
     // self.camera.position = rl.Vector3Add(self.camera.target, vec3(0, 8, 0.5));
-    self.camera.position = rl.Vector3Add(self.camera.target, vec3(0, 10, 0.5));
+    self.camera.position = rl.Vector3Add(self.camera.target, vec3(0, 9, 0.5));
     rl.UpdateCamera(&self.camera, rl.CAMERA_CUSTOM);
     rl.SetShaderValue(
         self.shader,
@@ -238,11 +248,6 @@ pub fn update(self: *Self) !void {
     self.light.position = rl.Vector3Add(self.camera.position, vec3(5, 5, 5));
     rll.UpdateLightValues(self.shader, self.light);
 
-    //freeze while not focusing on room center
-    if (self.curr_room != null and rl.FloatEquals(dist, 0) == 0) {
-        return;
-    }
-
     self.doors_open = true;
     self.tile_models.set(.door, self.door_open);
     for (self.enemies.items) |*e| {
@@ -251,6 +256,11 @@ pub fn update(self: *Self) !void {
             self.tile_models.set(.door, self.door_closed);
             break;
         }
+    }
+
+    //freeze while not focusing on room center
+    if (self.curr_room != null and rl.FloatEquals(dist, 0) == 0) {
+        return;
     }
 
     const delta = rl.GetFrameTime();

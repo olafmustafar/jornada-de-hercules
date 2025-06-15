@@ -38,8 +38,8 @@ pub fn initial_scene(alloc: std.mem.Allocator) !Level {
     } } });
 
     try level.placeholders.append(.{ .position = .init(13, 5), .entity = .{ .item = {} } });
-    try level.placeholders.append(.{ .position = .init(10, 2), .entity = .{ .exit = .up } });
-    try level.placeholders.append(.{ .position = .init(11, 2), .entity = .{ .exit = .up } });
+    try level.placeholders.append(.{ .position = .init(10, 4), .entity = .{ .exit = .up } });
+    try level.placeholders.append(.{ .position = .init(11, 4), .entity = .{ .exit = .up } });
 
     try level.room_rects.append(.{ .x = 4, .y = 4, .w = 14, .h = 6 });
     try level.room_rects.append(.{ .x = 4, .y = 10, .w =14, .h = 8 });

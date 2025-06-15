@@ -21,6 +21,7 @@ die_animation: rl.ModelAnimation,
 animation_counter: i32,
 health: i32,
 immunity_frames: f32,
+exiting_direction: ?rl.Vector2,
 
 pub fn init(models: *std.ArrayList(rl.Model), animations: *std.ArrayList(*rl.ModelAnimation)) !Self {
     var animation_count: usize = 0;
@@ -41,6 +42,7 @@ pub fn init(models: *std.ArrayList(rl.Model), animations: *std.ArrayList(*rl.Mod
         .health = max_health,
         .is_attacking = false,
         .immunity_frames = 0.0,
+        .exiting_direction = null,
     };
 
     try models.append(self.model);
@@ -51,6 +53,7 @@ pub fn init(models: *std.ArrayList(rl.Model), animations: *std.ArrayList(*rl.Mod
 
 pub fn update(self: *Self) void {
     const delta = rl.GetFrameTime();
+    const world = World.get();
 
     if (!self.alive) {
         if (self.animation_counter < self.current_animation.frameCount - 1) {
@@ -59,9 +62,21 @@ pub fn update(self: *Self) void {
         }
         return;
     }
-    if( self.immunity_frames > 0 ) self.immunity_frames -= delta;
+    if (self.immunity_frames > 0) self.immunity_frames -= delta;
 
-    if (!self.is_attacking) {
+    for (world.exits.items) |exit| {
+        const rec = rl.Rectangle{ .x = exit.pos.x - 0.5, .y = exit.pos.y - 0.5, .width = 1, .height = 1 };
+        if (rl.CheckCollisionCircleRec(self.position, self.radius, rec)) {
+            self.exiting_direction = c.dir_to_vec2(exit.dir);
+        }
+    }
+
+    if (self.exiting_direction) |exiting_direction| {
+        const movement = rl.Vector2Normalize(exiting_direction);
+        self.position = rl.Vector2Add(self.position, rl.Vector2Scale(movement, delta * self.speed));
+        self.angle = rl.Vector2Angle(c.vec2(0, 1), movement) * -rl.RAD2DEG;
+        self.current_animation = self.sprint_animation;
+    } else if (!self.is_attacking) {
         var movement = rl.Vector2Zero();
         if (rl.IsKeyDown(rl.KEY_D) or rl.IsKeyDown(rl.KEY_RIGHT)) {
             movement = rl.Vector2Add(movement, c.vec2(1, 0));
@@ -77,18 +92,18 @@ pub fn update(self: *Self) void {
         }
         if ((rl.Vector2Equals(movement, rl.Vector2Zero())) == 0) {
             movement = rl.Vector2Normalize(movement);
-            const new_pos = rl.Vector2Add(self.position, rl.Vector2Scale(movement, delta * self.speed));
-            self.position = new_pos;
+            self.position = rl.Vector2Add(self.position, rl.Vector2Scale(movement, delta * self.speed));
             self.angle = rl.Vector2Angle(c.vec2(0, 1), movement) * -rl.RAD2DEG;
             self.current_animation = self.sprint_animation;
         } else {
             self.current_animation = self.idle_animation;
         }
-    }
-    if (!self.is_attacking and rl.IsKeyPressed(rl.KEY_J)) {
-        self.is_attacking = true;
-        self.animation_counter = 0;
-        self.current_animation = self.attack_animation;
+
+        if (rl.IsKeyPressed(rl.KEY_J)) {
+            self.is_attacking = true;
+            self.animation_counter = 0;
+            self.current_animation = self.attack_animation;
+        }
     }
 
     if (self.is_attacking) {
