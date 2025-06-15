@@ -23,7 +23,7 @@ health: i32,
 immunity_frames: f32,
 exiting_direction: ?rl.Vector2,
 
-pub fn init(models: *std.ArrayList(rl.Model), animations: *std.ArrayList(*rl.ModelAnimation)) !Self {
+pub fn init(models: *std.ArrayList(rl.Model), model_animations: *std.ArrayList(World.Animations)) !Self {
     var animation_count: usize = 0;
     const player_animations = rl.LoadModelAnimations("assets/player.glb", @ptrCast(&animation_count));
     const self = Self{
@@ -46,7 +46,7 @@ pub fn init(models: *std.ArrayList(rl.Model), animations: *std.ArrayList(*rl.Mod
     };
 
     try models.append(self.model);
-    try animations.append(player_animations);
+    try model_animations.append(.{ .vec = player_animations, .size = @intCast(animation_count) });
 
     return self;
 }
@@ -76,6 +76,7 @@ pub fn update(self: *Self) void {
         self.position = rl.Vector2Add(self.position, rl.Vector2Scale(movement, delta * self.speed));
         self.angle = rl.Vector2Angle(c.vec2(0, 1), movement) * -rl.RAD2DEG;
         self.current_animation = self.sprint_animation;
+        world.spotlight_open = false;
     } else if (!self.is_attacking) {
         var movement = rl.Vector2Zero();
         if (rl.IsKeyDown(rl.KEY_D) or rl.IsKeyDown(rl.KEY_RIGHT)) {

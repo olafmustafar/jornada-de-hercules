@@ -1,14 +1,11 @@
 const std = @import("std");
 
 const PCGManager = @import("pcgmanager");
-
+const c = @import("commons.zig");
 const rl = @import("raylib.zig");
 const rll = @import("rlights.zig");
 const World = @import("World.zig");
 const scenes = @import("scenes.zig");
-
-const window_w = 800;
-const window_h = 600;
 
 pub fn main() !void {
     const alloc = std.heap.c_allocator;
@@ -36,7 +33,7 @@ pub fn main() !void {
     };
 
     rl.SetConfigFlags(rl.FLAG_MSAA_4X_HINT);
-    rl.InitWindow(window_w, window_h, "raylib [core] example - basic window");
+    rl.InitWindow(c.window_w, c.window_h, "raylib [core] example - basic window");
     rl.SetTargetFPS(60);
     rl.DisableCursor();
     defer rl.CloseWindow();
@@ -45,9 +42,14 @@ pub fn main() !void {
     defer initial.deinit();
 
     var world = try World.init(alloc, initial);
+    defer world.deinit();
 
     while (!rl.WindowShouldClose()) {
         try world.update();
         world.render();
+        if( world.finished ){
+            world.deinit();
+            world = try World.init(alloc, level.items[0]);
+        }
     }
 }

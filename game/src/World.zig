@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 const PCGManager = @import("pcgmanager");
 const Tile = PCGManager.Contents.Tile;
@@ -6,12 +7,15 @@ const Level = PCGManager.Contents.Level;
 const Enemy = PCGManager.Contents.Enemy;
 const Direction = PCGManager.Contents.Direction;
 
-const commons = @import("commons.zig");
-const vec2 = commons.vec2;
-const vec3 = commons.vec3;
+const c = @import("commons.zig");
+const vec2 = c.vec2;
+const vec3 = c.vec3;
 const Player = @import("Player.zig");
 const rl = @import("raylib.zig");
 const rll = @import("rlights.zig");
+const Spotlight = @import("Spotlight.zig");
+
+const glsl_version: i32 = if (builtin.target.cpu.arch.isWasm()) 100 else 330;
 
 var g_world: ?*Self = undefined;
 
@@ -39,7 +43,12 @@ const EnemyInstance = struct {
     flyer_move_target: ?rl.Vector2,
 };
 
-const Animations = struct {
+pub const Animations = struct {
+    vec: *rl.ModelAnimation,
+    size: usize,
+};
+
+const EnemyAnimations = struct {
     run: rl.ModelAnimation,
     idle: rl.ModelAnimation,
     attack: rl.ModelAnimation,
@@ -57,29 +66,37 @@ const Exit = struct {
 
 const window_w = 800;
 const window_h = 600;
+const max_spots = 3;
 
 level: Level,
-models: std.ArrayList(rl.Model),
-models_animations: std.ArrayList(*rl.ModelAnimation),
 tile_models: std.EnumArray(Tile, ?rl.Model),
+models: std.ArrayList(rl.Model),
+models_animations: std.ArrayList(Animations),
+collidable_tiles: std.ArrayList(TileInstance),
+
+camera: rl.Camera3D,
+player: Player,
+curr_room: ?rl.Rectangle,
+exits: std.ArrayList(Exit),
+
+enemies: std.ArrayList(EnemyInstance),
+enemy_models: std.EnumArray(Enemy.Type, ?rl.Model),
+enemy_animations: std.EnumArray(Enemy.Type, ?EnemyAnimations),
+bullets: std.ArrayList(Bullet),
+bullet_model: rl.Model,
+
 shader: rl.Shader,
 light: rll.Light,
-camera: rl.Camera3D,
-collidable_tiles: std.ArrayList(TileInstance),
-enemies: std.ArrayList(EnemyInstance),
-bullets: std.ArrayList(Bullet),
-exits: std.ArrayList(Exit),
-bullet_model: rl.Model,
+
+spotlight: rl.Shader,
+spotlights: [max_spots]Spotlight,
+spotlight_open: bool,
+
 doors_open: bool,
 door_open: rl.Model,
 door_closed: rl.Model,
 
-enemy_models: std.EnumArray(Enemy.Type, ?rl.Model),
-enemy_animations: std.EnumArray(Enemy.Type, ?Animations),
-
-player: Player,
-
-curr_room: ?rl.Rectangle,
+finished: bool,
 
 pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
     var self: Self = undefined;
@@ -90,6 +107,7 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
     self.bullets = .init(allocator);
     self.bullet_model = rl.LoadModel("assets/bullet.glb");
     try self.models.append(self.bullet_model);
+    self.finished = false;
 
     self.camera = rl.Camera3D{
         .position = vec3(10.0, 5.0, 10.0),
@@ -98,12 +116,22 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
         .fovy = 60.0,
         .projection = rl.CAMERA_PERSPECTIVE,
     };
+    self.shader = rl.LoadShader(
+        rl.TextFormat("assets/shaders/glsl%i/lighting.vs", glsl_version),
+        rl.TextFormat("assets/shaders/glsl%i/lighting.fs", glsl_version),
+    );
 
-    self.shader = rl.LoadShader("assets/shaders/glsl100/lighting.vs", "assets/shaders/glsl100/lighting.fs");
     self.light = rll.CreateLight(rll.Light.Type.point, rl.Vector3Zero(), rl.Vector3Zero(), rl.WHITE, self.shader);
-
     const ambientLoc = rl.GetShaderLocation(self.shader, "ambient");
     rl.SetShaderValue(self.shader, ambientLoc, &[4]f32{ 2.0, 2.0, 2.0, 10.0 }, rl.SHADER_UNIFORM_VEC4);
+
+    self.spotlight = rl.LoadShader(null, rl.TextFormat("assets/shaders/glsl%i/spotlight.fs", glsl_version));
+    const wloc = rl.GetShaderLocation(self.spotlight, "screenWidth");
+    var sw: f32 = @floatFromInt(rl.GetScreenWidth() * 2);
+    rl.SetShaderValue(self.spotlight, wloc, &sw, rl.SHADER_UNIFORM_FLOAT);
+    for (&self.spotlights, 0..) |*spot, i|
+        spot.* = .init(@intCast(i), 0, 0, self.spotlight);
+    self.spotlight_open = true;
 
     self.doors_open = false;
     self.door_open = rl.LoadModel("assets/door_open.glb");
@@ -194,9 +222,6 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
         }
     }
 
-    for (self.enemies.items) |enemy|
-        try self.models.append(enemy.model);
-
     for (self.models.items) |model|
         model.materials[1].shader = self.shader;
 
@@ -204,9 +229,11 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
 }
 
 pub fn deinit(self: Self) void {
+    std.debug.print("DEINIT\n", .{});
     rl.UnloadShader(self.shader);
+    rl.UnloadShader(self.spotlight);
     for (self.models.items) |model| rl.UnloadModel(model);
-    for (self.models_animations.items) |animations| rl.UnloadModelAnimations(animations);
+    for (self.models_animations.items) |animations| rl.UnloadModelAnimations(animations.vec, @intCast(animations.size));
     self.models.deinit();
     self.models_animations.deinit();
     self.collidable_tiles.deinit();
@@ -226,16 +253,15 @@ pub fn update(self: *Self) !void {
         }
     }
 
-    const center = blk: {
-        if (self.curr_room) |room| {
-            break :blk vec2(room.x + (room.width / 2) - 0.5, room.y + (room.height / 2));
-        } else {
-            break :blk self.player.position;
-        }
-    };
+    var center = self.camera.target;
+    if (self.curr_room) |room| {
+        center = to_world_pos(vec2(room.x + (room.width / 2) - 0.5, room.y + (room.height / 2)));
+    } else if (self.player.exiting_direction == null) {
+        center = to_world_pos(self.player.position);
+    }
 
-    const dist = rl.Vector3Distance(self.camera.target, to_world_pos(center));
-    self.camera.target = rl.Vector3MoveTowards(self.camera.target, to_world_pos(center), rl.logf(dist + 1.1) * 0.1);
+    const dist = rl.Vector3Distance(self.camera.target, center);
+    self.camera.target = rl.Vector3MoveTowards(self.camera.target, center, rl.logf(dist + 1.1) * 0.1);
     // self.camera.position = rl.Vector3Add(self.camera.target, vec3(0, 8, 0.5));
     self.camera.position = rl.Vector3Add(self.camera.target, vec3(0, 9, 0.5));
     rl.UpdateCamera(&self.camera, rl.CAMERA_CUSTOM);
@@ -247,6 +273,21 @@ pub fn update(self: *Self) !void {
     );
     self.light.position = rl.Vector3Add(self.camera.position, vec3(5, 5, 5));
     rll.UpdateLightValues(self.shader, self.light);
+
+    for (&self.spotlights) |*spot| {
+        self.finished = self.player.exiting_direction != null and spot.radius == 0;
+
+        if (self.spotlight_open) {
+            spot.radius += 5;
+        } else {
+            spot.radius -= 5;
+        }
+        spot.radius = rl.Clamp(spot.radius, 0, (c.window_diagonal / 2) + 50);
+        spot.position.x = c.window_w / 2;
+        spot.position.y = c.window_h / 2;
+        spot.inner = spot.radius - 50;
+        spot.update(self.spotlight);
+    }
 
     self.doors_open = true;
     self.tile_models.set(.door, self.door_open);
@@ -267,6 +308,10 @@ pub fn update(self: *Self) !void {
 
     self.player.update();
     self.player.position = self.solve_collisions(self.player.position, self.player.radius);
+
+    if (rl.IsKeyPressed(rl.KEY_K)) {
+        self.spotlight_open = !self.spotlight_open;
+    }
 
     if (self.curr_room) |curr_room| {
         for (self.enemies.items) |*e| {
@@ -396,6 +441,12 @@ pub fn render(self: Self) void {
     rl.DrawRectangle(25, 25, 100, 20, rl.GRAY);
     rl.DrawRectangle(25, 25, @as(i32, @intFromFloat(life * 100.0)), 20, rl.RED);
     rl.DrawText("HP", 25, 25, 20, rl.WHITE);
+
+    {
+        rl.BeginShaderMode(self.spotlight);
+        defer rl.EndShaderMode();
+        rl.DrawRectangle(0, 0, c.window_w, c.window_h, rl.WHITE);
+    }
 }
 
 pub fn get() *Self {
@@ -453,6 +504,6 @@ fn solve_collisions_impl(self: *Self, circ: rl.Vector2, radius: f32, is_flyer: b
 fn load_animation(self: *Self, enemy_type: Enemy.Type, name: []const u8, atk_idx: usize, idle_idx: usize, run_idx: usize) !void {
     var anim_count: i32 = 0;
     const anims = rl.LoadModelAnimations(@ptrCast(name), @ptrCast(&anim_count));
-    self.enemy_animations.set(enemy_type, Animations{ .attack = anims[atk_idx], .idle = anims[idle_idx], .run = anims[run_idx] });
-    try self.models_animations.append(anims);
+    self.enemy_animations.set(enemy_type, EnemyAnimations{ .attack = anims[atk_idx], .idle = anims[idle_idx], .run = anims[run_idx] });
+    try self.models_animations.append(.{ .vec = anims, .size = @intCast(anim_count) });
 }
