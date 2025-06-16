@@ -424,14 +424,7 @@ pub fn render(self: Self) void {
             rl.DrawModelEx(self.bullet_model, to_world_pos(e.pos), vec3(0, 1, 0), angle, rl.Vector3Scale(rl.Vector3One(), 0.3), rl.WHITE);
         }
 
-        rl.DrawModelEx(
-            self.player.model,
-            to_world_pos(self.player.position),
-            vec3(0, 1, 0),
-            self.player.angle,
-            rl.Vector3Scale(rl.Vector3One(), 0.5),
-            if (@mod(self.player.immunity_frames, 0.5) > 0.25 or self.player.immunity_frames <= 0) rl.WHITE else rl.RED,
-        );
+        self.player.render();
 
         rl.DrawSphere(self.light.position, 0.15, rl.YELLOW);
     }
@@ -462,7 +455,7 @@ fn to_world_pos_y(pos: rl.Vector2, y: f32) rl.Vector3 {
     return vec3(pos.x * 0.90, y, pos.y * 0.90);
 }
 
-fn to_world_pos(pos: rl.Vector2) rl.Vector3 {
+pub fn to_world_pos(pos: rl.Vector2) rl.Vector3 {
     return vec3(pos.x * 0.90, 0, pos.y * 0.90);
 }
 

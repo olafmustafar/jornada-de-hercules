@@ -5,6 +5,7 @@ const c = @import("commons.zig");
 
 const Self = @This();
 pub const max_health = 100;
+const right_hand_bone_idx = 29;
 
 alive: bool,
 position: rl.Vector2,
@@ -12,7 +13,9 @@ radius: f32,
 angle: f32,
 speed: f32,
 is_attacking: bool,
+show_sword: bool,
 model: rl.Model,
+sword: rl.Model,
 current_animation: rl.ModelAnimation,
 sprint_animation: rl.ModelAnimation,
 idle_animation: rl.ModelAnimation,
@@ -29,6 +32,7 @@ pub fn init(models: *std.ArrayList(rl.Model), model_animations: *std.ArrayList(W
     const self = Self{
         .alive = true,
         .model = rl.LoadModel("assets/player.glb"),
+        .sword = rl.LoadModel("assets/sword.glb"),
         .sprint_animation = player_animations[38],
         .idle_animation = player_animations[9],
         .attack_animation = player_animations[41],
@@ -41,11 +45,13 @@ pub fn init(models: *std.ArrayList(rl.Model), model_animations: *std.ArrayList(W
         .speed = 3.00,
         .health = max_health,
         .is_attacking = false,
+        .show_sword = true,
         .immunity_frames = 0.0,
         .exiting_direction = null,
     };
 
     try models.append(self.model);
+    try models.append(self.sword);
     try model_animations.append(.{ .vec = player_animations, .size = @intCast(animation_count) });
 
     return self;
@@ -155,5 +161,35 @@ pub fn take_hit(self: *Self, dmg: i32) void {
             self.current_animation = self.die_animation;
         }
         self.immunity_frames = 2;
+    }
+}
+
+pub fn render(self: Self) void {
+    const player_pos = World.to_world_pos(self.position);
+    const player_scale = rl.Vector3Scale(rl.Vector3One(), 0.5);
+    rl.DrawModelEx(
+        self.model,
+        player_pos,
+        c.vec3(0, 1, 0),
+        self.angle,
+        player_scale,
+        if (@mod(self.immunity_frames, 0.5) > 0.25 or self.immunity_frames <= 0) rl.WHITE else rl.RED,
+    );
+
+    if (self.show_sword) {
+        //draw the sword on player hand
+        const bone_trans = self.current_animation.framePoses[@intCast(self.animation_counter)][right_hand_bone_idx];
+        const in_rotation = self.model.bindPose[right_hand_bone_idx].rotation;
+        const rotate = rl.QuaternionMultiply(bone_trans.rotation, rl.QuaternionInvert(in_rotation));
+        var mat_trans = rl.MatrixIdentity();
+        mat_trans = rl.MatrixMultiply(mat_trans, rl.MatrixScale(0.15, 0.15, 0.15));
+        mat_trans = rl.MatrixMultiply(mat_trans, rl.MatrixRotateXYZ(c.vec3(90, 0, 0)));
+        mat_trans = rl.MatrixMultiply(mat_trans, rl.QuaternionToMatrix(rotate));
+        mat_trans = rl.MatrixMultiply(mat_trans, rl.MatrixTranslate(bone_trans.translation.x, bone_trans.translation.y, bone_trans.translation.z));
+        mat_trans = rl.MatrixMultiply(mat_trans, self.model.transform);
+        mat_trans = rl.MatrixMultiply(mat_trans, rl.MatrixRotateY(self.angle * rl.DEG2RAD));
+        mat_trans = rl.MatrixMultiply(mat_trans, rl.MatrixScale(player_scale.x, player_scale.y, player_scale.z));
+        mat_trans = rl.MatrixMultiply(mat_trans, rl.MatrixTranslate(player_pos.x, player_pos.y, player_pos.z));
+        rl.DrawMesh(self.sword.meshes[0], self.sword.materials[1], mat_trans);
     }
 }
