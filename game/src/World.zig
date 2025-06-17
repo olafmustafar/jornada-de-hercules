@@ -11,6 +11,7 @@ const c = @import("commons.zig");
 const vec2 = c.vec2;
 const vec3 = c.vec3;
 const Player = @import("Player.zig");
+const Npc = @import("Npc.zig");
 const rl = @import("raylib.zig");
 const rll = @import("rlights.zig");
 const Spotlight = @import("Spotlight.zig");
@@ -79,6 +80,8 @@ player: Player,
 curr_room: ?rl.Rectangle,
 exits: std.ArrayList(Exit),
 
+npcs: std.ArrayList(Npc),
+
 enemies: std.ArrayList(EnemyInstance),
 enemy_models: std.EnumArray(Enemy.Type, ?rl.Model),
 enemy_animations: std.EnumArray(Enemy.Type, ?EnemyAnimations),
@@ -106,6 +109,7 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
     self.exits = .init(allocator);
     self.bullets = .init(allocator);
     self.bullet_model = rl.LoadModel("assets/bullet.glb");
+    self.npcs = .init(allocator);
     try self.models.append(self.bullet_model);
     self.finished = false;
 
@@ -217,7 +221,14 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
             .exit => |exit| {
                 try self.exits.append(.{ .dir = exit, .pos = vec2(@floatFromInt(ph.position.x), @floatFromInt(ph.position.y)) });
             },
-            .npc => {},
+            .npc => |npc| {
+                try self.npcs.append(try .init(
+                    vec2(@floatFromInt(ph.position.x), @floatFromInt(ph.position.y)),
+                    npc.dialog,
+                    &self.models,
+                    &self.models_animations,
+                ));
+            },
             .item => {},
         }
     }
@@ -240,6 +251,7 @@ pub fn deinit(self: Self) void {
     self.enemies.deinit();
     self.bullets.deinit();
     self.exits.deinit();
+    self.npcs.deinit();
 }
 
 pub fn update(self: *Self) !void {
@@ -384,6 +396,8 @@ pub fn update(self: *Self) !void {
     }
     self.bullets.deinit();
     self.bullets = new_bullets;
+
+    for (self.npcs.items) |*npc| npc.update();
 }
 
 pub fn render(self: Self) void {
@@ -425,6 +439,8 @@ pub fn render(self: Self) void {
         }
 
         self.player.render();
+
+        for (self.npcs.items) |npc| npc.render();
 
         rl.DrawSphere(self.light.position, 0.15, rl.YELLOW);
     }
