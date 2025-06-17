@@ -77,40 +77,54 @@ pub fn update(self: *Self) void {
         }
     }
 
-    if (self.exiting_direction) |exiting_direction| {
-        const movement = rl.Vector2Normalize(exiting_direction);
+    var movement = rl.Vector2Zero();
+    if (world.dialog == null) {
+        if (self.exiting_direction) |exiting_direction| {
+            movement = rl.Vector2Normalize(exiting_direction);
+            self.angle = rl.Vector2Angle(c.vec2(0, 1), movement) * -rl.RAD2DEG;
+            self.current_animation = self.sprint_animation;
+            world.spotlight_open = false;
+        } else if (!self.is_attacking) {
+            if (rl.IsKeyDown(rl.KEY_D) or rl.IsKeyDown(rl.KEY_RIGHT)) {
+                movement = rl.Vector2Add(movement, c.vec2(1, 0));
+            }
+            if (rl.IsKeyDown(rl.KEY_A) or rl.IsKeyDown(rl.KEY_LEFT)) {
+                movement = rl.Vector2Add(movement, c.vec2(-1, 0));
+            }
+            if (rl.IsKeyDown(rl.KEY_W) or rl.IsKeyDown(rl.KEY_UP)) {
+                movement = rl.Vector2Add(movement, c.vec2(0, -1));
+            }
+            if (rl.IsKeyDown(rl.KEY_S) or rl.IsKeyDown(rl.KEY_DOWN)) {
+                movement = rl.Vector2Add(movement, c.vec2(0, 1));
+            }
+            if (rl.IsKeyPressed(rl.KEY_J)) {
+                var npc_hit = false;
+                for (world.npcs.items) |*e| {
+                    if (self.check_hit_collision(e.position, 1)) {
+                        e.begin_dialog();
+                        self.angle = c.look_target_rad(self.position, e.position) * -rl.RAD2DEG;
+                        npc_hit = true;
+                        break;
+                    }
+                }
+
+                if (!npc_hit) {
+                    self.is_attacking = true;
+                    self.animation_counter = 0;
+                }
+            }
+        }
+    }
+
+    if (self.is_attacking) {
+        self.current_animation = self.attack_animation;
+    } else if ((rl.Vector2Equals(movement, rl.Vector2Zero())) == 0) {
+        movement = rl.Vector2Normalize(movement);
         self.position = rl.Vector2Add(self.position, rl.Vector2Scale(movement, delta * self.speed));
         self.angle = rl.Vector2Angle(c.vec2(0, 1), movement) * -rl.RAD2DEG;
         self.current_animation = self.sprint_animation;
-        world.spotlight_open = false;
-    } else if (!self.is_attacking) {
-        var movement = rl.Vector2Zero();
-        if (rl.IsKeyDown(rl.KEY_D) or rl.IsKeyDown(rl.KEY_RIGHT)) {
-            movement = rl.Vector2Add(movement, c.vec2(1, 0));
-        }
-        if (rl.IsKeyDown(rl.KEY_A) or rl.IsKeyDown(rl.KEY_LEFT)) {
-            movement = rl.Vector2Add(movement, c.vec2(-1, 0));
-        }
-        if (rl.IsKeyDown(rl.KEY_W) or rl.IsKeyDown(rl.KEY_UP)) {
-            movement = rl.Vector2Add(movement, c.vec2(0, -1));
-        }
-        if (rl.IsKeyDown(rl.KEY_S) or rl.IsKeyDown(rl.KEY_DOWN)) {
-            movement = rl.Vector2Add(movement, c.vec2(0, 1));
-        }
-        if ((rl.Vector2Equals(movement, rl.Vector2Zero())) == 0) {
-            movement = rl.Vector2Normalize(movement);
-            self.position = rl.Vector2Add(self.position, rl.Vector2Scale(movement, delta * self.speed));
-            self.angle = rl.Vector2Angle(c.vec2(0, 1), movement) * -rl.RAD2DEG;
-            self.current_animation = self.sprint_animation;
-        } else {
-            self.current_animation = self.idle_animation;
-        }
-
-        if (rl.IsKeyPressed(rl.KEY_J)) {
-            self.is_attacking = true;
-            self.animation_counter = 0;
-            self.current_animation = self.attack_animation;
-        }
+    } else {
+        self.current_animation = self.idle_animation;
     }
 
     if (self.is_attacking) {
@@ -133,23 +147,30 @@ pub fn update(self: *Self) void {
 }
 
 fn attack(self: *Self) void {
-    const angl = (self.angle - 90) * -rl.DEG2RAD;
-    const hit_radius = 0.3;
-    const hit_circle = rl.Vector2Add(self.position, rl.Vector2Scale(c.vec2(rl.cosf(angl), rl.sinf(angl)), 0.5));
-
     const world = World.get();
     for (world.enemies.items) |*e| {
-        if (rl.CheckCollisionCircles(hit_circle, hit_radius, e.pos, e.radius) or
-            rl.CheckCollisionCircles(self.position, hit_radius, e.pos, e.radius))
-        {
+        if (self.check_hit_collision(e.pos, e.radius)) {
             e.health_points -= 10;
             if (e.health_points <= 0) {
                 e.alive = false;
             } else {
+                const angl = self.look_angle();
                 e.inertia = rl.Vector2Scale(c.vec2(rl.cosf(angl), rl.sinf(angl)), 0.8);
             }
         }
     }
+}
+
+fn check_hit_collision(self: Self, other: rl.Vector2, other_radius: f32) bool {
+    const angl = self.look_angle();
+    const hit_radius = 0.3;
+    const hit_circle = rl.Vector2Add(self.position, rl.Vector2Scale(c.vec2(rl.cosf(angl), rl.sinf(angl)), 0.5));
+    return (rl.CheckCollisionCircles(hit_circle, hit_radius, other, other_radius) or
+        rl.CheckCollisionCircles(self.position, hit_radius, other, other_radius));
+}
+
+fn look_angle(self: Self) f32 {
+    return (self.angle - 90) * -rl.DEG2RAD;
 }
 
 pub fn take_hit(self: *Self, dmg: i32) void {

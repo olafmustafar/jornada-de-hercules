@@ -15,6 +15,7 @@ const Npc = @import("Npc.zig");
 const rl = @import("raylib.zig");
 const rll = @import("rlights.zig");
 const Spotlight = @import("Spotlight.zig");
+const Dialog = @import("Dialog.zig");
 
 const glsl_version: i32 = if (builtin.target.cpu.arch.isWasm()) 100 else 330;
 
@@ -99,6 +100,8 @@ doors_open: bool,
 door_open: rl.Model,
 door_closed: rl.Model,
 
+dialog: ?Dialog,
+
 finished: bool,
 
 pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
@@ -110,6 +113,7 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
     self.bullets = .init(allocator);
     self.bullet_model = rl.LoadModel("assets/bullet.glb");
     self.npcs = .init(allocator);
+    self.dialog = null;
     try self.models.append(self.bullet_model);
     self.finished = false;
 
@@ -224,6 +228,7 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
             .npc => |npc| {
                 try self.npcs.append(try .init(
                     vec2(@floatFromInt(ph.position.x), @floatFromInt(ph.position.y)),
+                    npc.name,
                     npc.dialog,
                     &self.models,
                     &self.models_animations,
@@ -252,6 +257,7 @@ pub fn deinit(self: Self) void {
     self.bullets.deinit();
     self.exits.deinit();
     self.npcs.deinit();
+    if (self.dialog) |*dialog| dialog.deinit();
 }
 
 pub fn update(self: *Self) !void {
@@ -398,6 +404,14 @@ pub fn update(self: *Self) !void {
     self.bullets = new_bullets;
 
     for (self.npcs.items) |*npc| npc.update();
+
+    if (self.dialog) |*dialog| {
+        dialog.update();
+        if (dialog.finished) {
+            dialog.deinit();
+            self.dialog = null;
+        }
+    }
 }
 
 pub fn render(self: Self) void {
@@ -450,6 +464,8 @@ pub fn render(self: Self) void {
     rl.DrawRectangle(25, 25, 100, 20, rl.GRAY);
     rl.DrawRectangle(25, 25, @as(i32, @intFromFloat(life * 100.0)), 20, rl.RED);
     rl.DrawText("HP", 25, 25, 20, rl.WHITE);
+
+    if (self.dialog) |dialog| dialog.render();
 
     {
         rl.BeginShaderMode(self.spotlight);

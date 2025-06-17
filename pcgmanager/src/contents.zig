@@ -162,7 +162,7 @@ pub const Enemy = struct {
 
 pub const Npc = struct {
     name: []const u8,
-    dialog: []const u8,
+    dialog: []const []const u8,
 };
 
 pub const EnemiesPerDifficulty = std.ArrayList(std.EnumArray(Enemy.Type, Enemy));
