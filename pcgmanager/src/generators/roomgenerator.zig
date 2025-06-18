@@ -1,19 +1,22 @@
 const std = @import("std");
-const Generator = @import("Generator.zig").Generator;
-const Context = @import("../Context.zig");
+
 const contents = @import("../contents.zig");
 const Room = contents.Room;
+const Rooms = contents.Rooms;
 const Enemy = contents.Enemy;
 const Tile = contents.Tile;
+const Context = @import("../Context.zig");
+const Generator = @import("Generator.zig").Generator;
 
-const InstructionTag = enum { generate, place_manual };
+const InstructionTag = enum { generate };
 
 pub const Instruction = union(InstructionTag) {
-    generate: struct {},
-    place_manual: Room,
+    generate: struct { dummy: i32 = 0 },
 };
 
-const rooms = [_]struct { []const u8, []const struct { usize, usize } }{
+const Prefab = struct { []const u8, []const struct { usize, usize } };
+
+const prefabs = [_]Prefab{
     .{
         \\............
         \\.##..##..##.
@@ -112,6 +115,19 @@ const rooms = [_]struct { []const u8, []const struct { usize, usize } }{
     },
 };
 
+const boss_room = Prefab{
+    \\####....####
+    \\##........##
+    \\#..........#
+    \\............
+    \\............
+    \\#..........#
+    \\##........##
+    \\####....####
+    ,
+    &.{.{ 5, 3 }},
+};
+
 const enemy_sets = [_][]const Enemy.Type{
     &.{ .flyer, .flyer },
     &.{ .fast_chaser, .fast_chaser },
@@ -123,43 +139,67 @@ const enemy_sets = [_][]const Enemy.Type{
     &.{ .walking_shooter, .flyer, .flyer },
 };
 
-fn generate(ctx: *Context, instruction: Instruction) Room {
+fn generate(ctx: *Context, instruction: Instruction) Rooms {
     switch (instruction) {
         .generate => |_| {
-            return get_random_room(ctx.random.random(), ctx.gpa) catch {
+            return generate_rooms(ctx.random.random(), ctx.gpa) catch {
                 unreachable;
             };
-        },
-        .place_manual => |room| {
-            return room;
         },
     }
 }
 
-fn get_random_room(rnd: std.Random, alloc: std.mem.Allocator) !Room {
-    var room: Room = undefined;
-    room.enemies = .init(alloc);
+fn generate_rooms(rnd: std.Random, alloc: std.mem.Allocator) !Rooms {
+    var rooms = Rooms{
+        .normal_rooms = .init(alloc),
+        .boss_room = undefined,
+    };
 
-    const room_str, const placeholders = rooms[rnd.uintAtMost(usize, rooms.len - 1)];
+    for (prefabs) |prefab| {
+        const room_str, const placeholders = prefab;
+        var room = Room{
+            .enemies = .init(alloc),
+            .type = .normal_room,
+            .tilemap = create_tilemap_from_string(room_str),
+        };
+        const enemies = get_random_enemy_set(rnd, placeholders.len);
+        for (placeholders, enemies) |p, e| {
+            try room.enemies.append(.{
+                .pos = .{ .x = @intCast(p[0]), .y = @intCast(p[1]) },
+                .type = e,
+            });
+        }
+        try rooms.normal_rooms.append(room);
+    }
 
-    var it = std.mem.splitSequence(u8, room_str, "\n");
+    const room_str, const placeholders = boss_room;
+    var room = Room{
+        .enemies = .init(alloc),
+        .type = .boss_room,
+        .tilemap = create_tilemap_from_string(room_str),
+    };
+    for (placeholders) |p| {
+        try room.enemies.append(.{
+            .pos = .{ .x = @intCast(p[0]), .y = @intCast(p[1]) },
+            .type = .boss,
+        });
+    }
+    rooms.boss_room = room;
+
+    return rooms;
+}
+
+fn create_tilemap_from_string(str: []const u8) [8][12]Tile {
+    var tilemap: [8][12]Tile = undefined;
+    var it = std.mem.splitSequence(u8, str, "\n");
     var row: usize = 0;
     while (it.next()) |line| {
         for (line[0..12], 0..) |char, col| {
-            room.tilemap[row][col] = Tile.from_char(char);
+            tilemap[row][col] = Tile.from_char(char);
         }
         row += 1;
     }
-
-    const enemies = get_random_enemy_set(rnd, placeholders.len);
-    for (placeholders, enemies) |p, e| {
-        try room.enemies.append(.{
-            .pos = .{ .x = @intCast(p[0]), .y = @intCast(p[1]) },
-            .type = e,
-        });
-    }
-
-    return room;
+    return tilemap;
 }
 
 fn get_random_enemy_set(rnd: std.Random, size: usize) []const Enemy.Type {
@@ -169,4 +209,4 @@ fn get_random_enemy_set(rnd: std.Random, size: usize) []const Enemy.Type {
     return enemy_set;
 }
 
-pub const RoomGenerator = Generator(Instruction, Room, generate);
+pub const RoomGenerator = Generator(Instruction, Rooms, generate);

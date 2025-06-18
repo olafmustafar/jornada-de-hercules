@@ -83,8 +83,19 @@ pub const Tile = enum {
 
 pub const Room = struct {
     pub const Placeholder = struct { pos: Position, type: Enemy.Type };
+    pub const Type = enum {
+        normal_room,
+        boss_room,
+    };
+
+    type: Type,
     tilemap: [8][12]Tile,
     enemies: std.ArrayList(Room.Placeholder),
+};
+
+pub const Rooms = struct {
+    normal_rooms: std.ArrayList(Room),
+    boss_room: Room,
 };
 
 pub const Node = struct {
@@ -151,6 +162,7 @@ pub const Enemy = struct {
         shooter,
         walking_shooter,
         flyer,
+        boss,
     };
 
     type: Type,
@@ -185,7 +197,6 @@ pub const Placeholder = struct {
         enemy: Enemy,
         item: void,
         npc: Npc,
-        //TODO items, npcs, exits
     },
 };
 

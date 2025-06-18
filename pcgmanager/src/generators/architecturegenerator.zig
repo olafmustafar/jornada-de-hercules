@@ -118,15 +118,15 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
         }
 
         var exit: ?Direction = null;
-        if (!expand.is_branch and expand.diameter_left - 1 == 0) {
+        if (!expand.is_branch and (expand.diameter_left - 1) == 0) {
             exit = choose_random_available_direction(rnd, origin.pos, &origin.directions, position_set, expand.direction);
             if (exit) |dir| {
                 try position_set.put(origin.pos.move(dir), {});
             } else {
                 count = 0;
                 try reset_state(ctx, &architecture, &position_set, &expand_queue, args.diameter);
+                continue;
             }
-            continue;
         }
 
         const dir = dir_opt.?;

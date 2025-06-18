@@ -327,10 +327,6 @@ pub fn update(self: *Self) !void {
     self.player.update();
     self.player.position = self.solve_collisions(self.player.position, self.player.radius);
 
-    if (rl.IsKeyPressed(rl.KEY_K)) {
-        self.spotlight_open = !self.spotlight_open;
-    }
-
     if (self.curr_room) |curr_room| {
         for (self.enemies.items) |*e| {
             if (!e.alive or !rl.CheckCollisionPointRec(e.pos, curr_room))

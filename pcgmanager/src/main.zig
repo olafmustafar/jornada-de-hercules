@@ -5,11 +5,7 @@ pub fn main() !void {
     const alloc = std.heap.page_allocator;
     var pcg = try PCGManager.init(alloc);
 
-    try pcg.generate(.{ .room = .{ .generate = .{} } });
-    try pcg.generate(.{ .room = .{ .generate = .{} } });
-    try pcg.generate(.{ .room = .{ .generate = .{} } });
-    try pcg.generate(.{ .room = .{ .generate = .{} } });
-    try pcg.generate(.{ .room = .{ .generate = .{} } });
+    try pcg.generate(.{ .rooms = .{ .generate = .{} } });
     try pcg.generate(.{ .enemies = .{ .generate = .{} } });
     try pcg.generate(.{ .architecture = .{ .generate = .{
         .diameter = 10,
@@ -20,25 +16,33 @@ pub fn main() !void {
         .change_direction_chance = 0.25,
     } } });
 
-    const level = try pcg.retrieve_level();
-    defer level.deinit();
+    const levels = try pcg.retrieve_level();
+    defer levels.deinit();
+    defer for (levels.items) |lvl| lvl.deinit();
 
-    for (0..level.tilemap.height) |y| {
-        for (0..level.tilemap.width) |x| {
-            var is_enemy = false;
-            for (level.enemies.items) |en| {
-                if (en.pos.x == x and en.pos.y == y) {
-                    is_enemy = true;
-                    break;
+    for (levels.items) |level| {
+        for (0..level.tilemap.height) |y| {
+            for (0..level.tilemap.width) |x| {
+                var is_placeholder = false;
+                for (level.placeholders.items) |hdr| {
+                    if (hdr.position.x == x and hdr.position.y == y) {
+                        switch (hdr.entity) {
+                            .player => std.debug.print("@", .{}),
+                            .exit => std.debug.print("E", .{}),
+                            .enemy => std.debug.print("e", .{}),
+                            .item => std.debug.print("i", .{}),
+                            .npc => std.debug.print("%", .{}),
+                        }
+                        is_placeholder = true;
+                        break;
+                    }
+                }
+
+                if (!is_placeholder) {
+                    std.debug.print("{c}", .{level.tilemap.get(x, y).to_char()});
                 }
             }
-
-            if (is_enemy) {
-                std.debug.print("E", .{});
-            } else {
-                std.debug.print("{c}", .{level.tilemap.get(x, y).to_char()});
-            }
+            std.debug.print("\n", .{});
         }
-        std.debug.print("\n", .{});
     }
 }

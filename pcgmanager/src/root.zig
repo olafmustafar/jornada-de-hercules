@@ -17,13 +17,13 @@ orquestrator: Orquestrator,
 gpa: std.mem.Allocator,
 
 const InstructionTag = enum {
-    room,
+    rooms,
     architecture,
     enemies,
 };
 
 pub const Instruction = union(InstructionTag) {
-    room: RoomGenerator.Instruction,
+    rooms: RoomGenerator.Instruction,
     architecture: ArchitectureGenerator.Instruction,
     enemies: EnemiesGenerator.Instruction,
 };
@@ -48,16 +48,17 @@ pub fn deinit(self: *Self) void {
 
 pub fn generate(self: *Self, instruction: Instruction) !void {
     try switch (instruction) {
-        .room => |room_inst| self.room_generator.add(room_inst),
+        .rooms => |room_inst| self.room_generator.add(room_inst),
         .architecture => |arch_instr| self.architecture_generator.add(arch_instr),
         .enemies => |instr| self.enemies_generator.add(instr),
     };
 }
 
 pub fn retrieve_level(self: *Self) !Contents.Levels {
-    const rooms = try self.room_generator.wait_results(); defer rooms.deinit();
-    for (rooms.items) |room| {
-        try self.orquestrator.add(.{ .room = room });
+    const rooms_list = try self.room_generator.wait_results();
+    defer rooms_list.deinit();
+    for (rooms_list.items) |rooms| {
+        try self.orquestrator.add(.{ .rooms = rooms });
     }
 
     const enemies_per_difficulty = try self.enemies_generator.wait_results();
