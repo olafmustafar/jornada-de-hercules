@@ -4,7 +4,6 @@ const Room = contents.Room;
 const Rooms = contents.Rooms;
 const Architecture = contents.Architecture;
 const Level = contents.Level;
-const Levels = contents.Levels;
 const Tilemap = contents.Tilemap;
 const Pos = contents.Position;
 const Direction = contents.Direction;
@@ -26,9 +25,9 @@ const Content = union(ContentTag) {
     enemies_per_difficulty: EnemiesPerDifficulty,
 };
 
-rooms: std.ArrayList(Rooms),
+rooms: ?Rooms,
 enemies_per_difficulty: ?EnemiesPerDifficulty,
-architectures: std.ArrayList(Architecture),
+architecture: ?Architecture,
 gpa: std.mem.Allocator,
 
 const spawn_tilemap =
@@ -43,30 +42,33 @@ const spawn_tilemap =
 ;
 
 pub fn init(alloc: std.mem.Allocator) Self {
-    return .{ .rooms = .init(alloc), .architectures = .init(alloc), .enemies_per_difficulty = null, .gpa = alloc };
+    return .{ .rooms = null, .architecture = null, .enemies_per_difficulty = null, .gpa = alloc };
 }
 
-pub fn add(self: *Self, content: Content) !void {
-    try switch (content) {
-        .architecture => |arch| self.architectures.append(arch),
-        .rooms => |rooms| self.rooms.append(rooms),
-        .enemies_per_difficulty => |enemies_per_difficulty| self.enemies_per_difficulty = enemies_per_difficulty,
-    };
-}
+pub fn add(self: *Self, content: Content) void {
+    switch (content) {
+        .architecture => |arch| {
+            if (self.architecture) |old_arch| old_arch.deinit();
+            self.architecture = arch;
+        },
 
-pub fn combine(self: *Self) !Levels {
-    std.debug.assert(self.rooms.items.len > 0);
-    std.debug.assert(self.enemies_per_difficulty != null);
-    std.debug.assert(self.architectures.items.len > 0);
+        .rooms => |rooms| {
+            if (self.rooms) |old_rooms| old_rooms.deinit();
+            self.rooms = rooms;
+        },
 
-    var levels = Levels.init(self.gpa);
-    for (self.architectures.items) |architecture| {
-        try levels.append(try self.combine_pair(architecture, self.rooms.items[0], self.enemies_per_difficulty.?));
+        .enemies_per_difficulty => |enemies_per_difficulty| {
+            if (self.enemies_per_difficulty) |enemies| enemies.deinit();
+            self.enemies_per_difficulty = enemies_per_difficulty;
+        },
     }
-    return levels;
 }
 
-fn combine_pair(self: Self, architecture: Architecture, rooms: Rooms, enemies_map: EnemiesPerDifficulty) !Level {
+pub fn combine(self: *Self) !Level {
+    return try self.combine_impl(self.architecture.?, self.rooms.?, self.enemies_per_difficulty.?);
+}
+
+fn combine_impl(self: Self, architecture: Architecture, rooms: Rooms, enemies_map: EnemiesPerDifficulty) !Level {
     var arch_min_pos = Pos.init(100, 100);
     var arch_max_pos = Pos.init(-100, -100);
     for (architecture.items) |node| {

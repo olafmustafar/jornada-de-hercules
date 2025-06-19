@@ -82,17 +82,24 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
 
     try reset_state(ctx, &architecture, &position_set, &expand_queue, args.diameter);
 
-    var count: i32 = 0;
     while (expand_queue.items.len > 0) {
         const expand = expand_queue.pop().?;
+        var origin = &architecture.items[expand.origin_idx];
+
         if (expand.diameter_left == 0) {
+            var exit: ?Direction = null;
+            if (!expand.is_branch) {
+                exit = choose_random_available_direction(rnd, origin.pos, &origin.directions, position_set, expand.direction);
+                if (exit) |dir| {
+                    origin.directions.set(dir, true);
+                    origin.exit = dir;
+                    try position_set.put(origin.pos.move(dir), {});
+                } else {
+                    try reset_state(ctx, &architecture, &position_set, &expand_queue, args.diameter);
+                }
+            }
             continue;
         }
-
-        count += 1;
-        print_arch(&architecture);
-
-        var origin = &architecture.items[expand.origin_idx];
 
         var corridor_length: usize = undefined;
         var dir_opt: ?Direction = null;
@@ -111,30 +118,16 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
             //nowhere to expand to
             if (!expand.is_branch) {
                 //try again
-                count = 0;
                 try reset_state(ctx, &architecture, &position_set, &expand_queue, args.diameter);
             }
             continue;
         }
 
-        var exit: ?Direction = null;
-        if (!expand.is_branch and (expand.diameter_left - 1) == 0) {
-            exit = choose_random_available_direction(rnd, origin.pos, &origin.directions, position_set, expand.direction);
-            if (exit) |dir| {
-                try position_set.put(origin.pos.move(dir), {});
-            } else {
-                count = 0;
-                try reset_state(ctx, &architecture, &position_set, &expand_queue, args.diameter);
-                continue;
-            }
-        }
-
         const dir = dir_opt.?;
-        origin.directions.set(dir, true);
         var new_node = Node{
             .pos = origin.pos.move(dir),
             .directions = .initDefault(false, .{}),
-            .exit = exit,
+            .exit = null,
             .is_spawn = false,
             .is_branch = expand.is_branch,
             .difficulty_class = if (@as(f32, @floatFromInt(expand.diameter_left)) > (@as(f32, @floatFromInt(args.diameter)) * 0.6))
@@ -144,6 +137,8 @@ fn generate_architecture(ctx: *Context, args: GenerateArgs) !Architecture {
             else
                 ctx.difficulty_level + 1,
         };
+
+        origin.directions.set(dir, true);
         new_node.directions.set(dir.inverse(), true);
 
         try position_set.put(new_node.pos, {});
@@ -201,14 +196,5 @@ fn choose_random_available_direction(rnd: std.Random, current_pos: Position, ava
     }
     return dir;
 }
-fn print_arch(arch: *Architecture) void {
-    var board = std.mem.zeroes([20][20]i32);
-    for (arch.items) |node| {
-        if (node.is_branch) {
-            board[@intCast(node.pos.y + 10)][@intCast(node.pos.x + 10)] = 2;
-        } else {
-            board[@intCast(node.pos.y + 10)][@intCast(node.pos.x + 10)] = 1;
-        }
-    }
-}
+
 pub const ArchitectureGenerator = Generator(Instruction, Architecture, generate);

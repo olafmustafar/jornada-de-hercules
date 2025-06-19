@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const PCGManager = @import("pcgmanager");
+const contents = PCGManager.Contents;
 const c = @import("commons.zig");
 const rl = @import("raylib.zig");
 const rll = @import("rlights.zig");
@@ -14,42 +15,77 @@ pub fn main() !void {
     defer rl.CloseWindow();
 
     const alloc = std.heap.c_allocator;
+
+    const initial = try scenes.initial_scene(alloc);
+    defer initial.deinit();
+
+    const levels = try generate_levels(alloc);
+    defer for (levels) |lvl| lvl.deinit();
+
+    var world = try World.init(alloc, initial);
+    defer world.deinit();
+
+    var lvl_i: usize = 0;
+    while (!rl.WindowShouldClose()) {
+        try world.update();
+        world.render();
+
+        if (world.finished) {
+            if (lvl_i == levels.len) {
+                break;
+            }
+
+            world.deinit();
+            world = try World.init(alloc, levels[0]);
+            lvl_i += 1;
+        }
+    }
+}
+
+fn generate_levels(alloc: std.mem.Allocator) ![3]contents.Level {
+    var levels: [3]contents.Level = undefined;
+
     var pcg = try PCGManager.init(alloc);
-    try pcg.generate(.{ .room = .{ .generate = .{} } });
-    try pcg.generate(.{ .room = .{ .generate = .{} } });
-    try pcg.generate(.{ .room = .{ .generate = .{} } });
-    try pcg.generate(.{ .room = .{ .generate = .{} } });
-    try pcg.generate(.{ .room = .{ .generate = .{} } });
+    defer pcg.deinit();
+
+    pcg.context.difficulty_level = 4;
+    try pcg.generate(.{ .rooms = .{ .generate = .{} } });
     try pcg.generate(.{ .enemies = .{ .generate = .{} } });
     try pcg.generate(.{ .architecture = .{ .generate = .{
-        .diameter = 10,
-        .max_corridor_length = 5,
+        .diameter = 3,
+        .max_corridor_length = 3,
         .branch_chance = 0.25,
         .min_branch_diameter = 2,
         .max_branch_diameter = 5,
         .change_direction_chance = 0.25,
     } } });
+    levels[0] = try pcg.retrieve_level();
 
-    const level = try pcg.retrieve_level();
-    defer level.deinit();
-    defer for (level.items) |l| {
-        l.deinit();
-    };
+    pcg.context.difficulty_level = 4;
+    try pcg.generate(.{ .enemies = .{ .generate = .{} } });
+    try pcg.generate(.{ .architecture = .{ .generate = .{
+        .diameter = 5,
+        .max_corridor_length = 2,
+        .branch_chance = 0.25,
+        .min_branch_diameter = 1,
+        .max_branch_diameter = 1,
+        .change_direction_chance = 0.30,
+    } } });
+    levels[1] = try pcg.retrieve_level();
 
-    const initial = try scenes.initial_scene(alloc);
-    defer initial.deinit();
+    pcg.context.difficulty_level = 5;
+    try pcg.generate(.{ .enemies = .{ .generate = .{} } });
+    try pcg.generate(.{ .architecture = .{ .generate = .{
+        .diameter = 6,
+        .max_corridor_length = 3,
+        .branch_chance = 0.25,
+        .min_branch_diameter = 2,
+        .max_branch_diameter = 5,
+        .change_direction_chance = 0.25,
+    } } });
+    levels[2] = try pcg.retrieve_level();
 
-    var world = try World.init(alloc, initial);
-    defer world.deinit();
-
-    while (!rl.WindowShouldClose()) {
-        try world.update();
-        world.render();
-        if (world.finished) {
-            world.deinit();
-            world = try World.init(alloc, level.items[0]);
-        }
-    }
+    return levels;
 }
 
 fn _test() void {

@@ -172,6 +172,7 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
         .shooter = rl.LoadModel("assets/snake.glb"),
         .walking_shooter = rl.LoadModel("assets/snake.glb"),
         .flyer = rl.LoadModel("assets/wasp.glb"),
+        .boss = rl.LoadModel("assets/lion.glb"),
     });
 
     for (self.enemy_models.values) |model_opt| {
@@ -186,6 +187,7 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
     try load_animation(&self, .shooter, "assets/snake.glb", 0, 2, 4);
     try load_animation(&self, .walking_shooter, "assets/snake.glb", 0, 2, 4);
     try load_animation(&self, .flyer, "assets/wasp.glb", 0, 2, 2);
+    try load_animation(&self, .boss, "assets/lion.glb", 3, 3, 3);
 
     self.player = try .init(&self.models, &self.models_animations);
 

@@ -69,12 +69,21 @@ fn get_random_enemies(ctx: *Context, classes: usize) !EnemiesPerDifficulty {
             .shooting_velocity = 0,
         };
 
+        const boss = Enemy {
+            .type = .boss,
+            .damage = multiplier * 0.8,
+            .health = multiplier * 1.8,
+            .velocity = multiplier * 0.8,
+            .shooting_velocity = 0,
+        };
+
         const last = &enemies.items[enemies.items.len - 1];
         last.set(.fast_chaser, fast_chaser);
         last.set(.slow_chaser, slow_chaser);
         last.set(.shooter, shooter);
         last.set(.walking_shooter, walking_shooter);
         last.set(.flyer, flyer);
+        last.set(.boss, boss);
     }
 
     return enemies;

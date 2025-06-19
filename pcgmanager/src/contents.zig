@@ -96,6 +96,10 @@ pub const Room = struct {
 pub const Rooms = struct {
     normal_rooms: std.ArrayList(Room),
     boss_room: Room,
+
+    pub fn deinit(self: Rooms) void {
+        self.normal_rooms.deinit();
+    }
 };
 
 pub const Node = struct {
@@ -229,5 +233,3 @@ pub const Level = struct {
     room_rects: std.ArrayList(Rect),
     placeholders: std.ArrayList(Placeholder),
 };
-
-pub const Levels = std.ArrayList(Level);

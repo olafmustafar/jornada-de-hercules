@@ -54,23 +54,23 @@ pub fn generate(self: *Self, instruction: Instruction) !void {
     };
 }
 
-pub fn retrieve_level(self: *Self) !Contents.Levels {
+pub fn retrieve_level(self: *Self) !Contents.Level {
     const rooms_list = try self.room_generator.wait_results();
     defer rooms_list.deinit();
     for (rooms_list.items) |rooms| {
-        try self.orquestrator.add(.{ .rooms = rooms });
+        self.orquestrator.add(.{ .rooms = rooms });
     }
 
     const enemies_per_difficulty = try self.enemies_generator.wait_results();
     defer enemies_per_difficulty.deinit();
     for (enemies_per_difficulty.items) |enemies| {
-        try self.orquestrator.add(.{ .enemies_per_difficulty = enemies });
+        self.orquestrator.add(.{ .enemies_per_difficulty = enemies });
     }
 
     const archs = try self.architecture_generator.wait_results();
     defer archs.deinit();
     for (archs.items) |arch| {
-        try self.orquestrator.add(.{ .architecture = arch });
+        self.orquestrator.add(.{ .architecture = arch });
     }
 
     return try self.orquestrator.combine();
