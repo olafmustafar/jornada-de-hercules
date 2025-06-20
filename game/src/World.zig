@@ -22,6 +22,11 @@ const glsl_version: i32 = if (builtin.target.cpu.arch.isWasm()) 100 else 330;
 var g_world: ?*Self = undefined;
 
 const Self = @This();
+const BossType = enum {
+    lion,
+    hydra,
+};
+
 const Bullet = struct {
     to_remove: bool,
     pos: rl.Vector2,
@@ -32,7 +37,7 @@ const Bullet = struct {
 const EnemyInstance = struct {
     alive: bool,
     model: rl.Model,
-    animation: rl.ModelAnimation,
+    animation: ?rl.ModelAnimation,
     angle: f32,
     enemy: Enemy,
     active: bool,
@@ -43,6 +48,33 @@ const EnemyInstance = struct {
     inertia: rl.Vector2,
     shooting_cooldown: f32,
     flyer_move_target: ?rl.Vector2,
+
+    pub fn init(self: *Self, pos: rl.Vector2, enemy: Enemy) EnemyInstance {
+        var ei = EnemyInstance{
+            .alive = true,
+            .model = self.enemy_models.get(enemy.type).?,
+            .animation = null,
+            .angle = 0.0,
+            .enemy = enemy,
+            .active = true,
+            .health_points = 100 * enemy.health,
+            .pos = pos,
+            .radius = 0.3,
+            .animation_frame = 0,
+            .inertia = rl.Vector2Zero(),
+            .shooting_cooldown = 0,
+            .flyer_move_target = null,
+        };
+
+        if (self.enemy_animations.get(enemy.type)) |anim| {
+            ei.animation = anim.run;
+        }
+        if (enemy.type == .boss and self.boss_type == .hydra) {
+            ei.radius = 0.5;
+            ei.enemy.velocity = 0;
+        }
+        return ei;
+    }
 };
 
 pub const Animations = struct {
@@ -83,11 +115,13 @@ exits: std.ArrayList(Exit),
 
 npcs: std.ArrayList(Npc),
 
+boss_type: BossType,
 enemies: std.ArrayList(EnemyInstance),
 enemy_models: std.EnumArray(Enemy.Type, ?rl.Model),
 enemy_animations: std.EnumArray(Enemy.Type, ?EnemyAnimations),
 bullets: std.ArrayList(Bullet),
 bullet_model: rl.Model,
+hydra_body: ?rl.Model,
 
 shader: rl.Shader,
 light: rll.Light,
@@ -104,9 +138,10 @@ dialog: ?Dialog,
 
 finished: bool,
 
-pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
+pub fn init(allocator: std.mem.Allocator, level: Level, boss_type: BossType) !Self {
     var self: Self = undefined;
     self.level = level;
+    self.boss_type = boss_type;
     self.models = std.ArrayList(rl.Model).init(allocator);
     self.models_animations = .init(allocator);
     self.exits = .init(allocator);
@@ -172,8 +207,15 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
         .shooter = rl.LoadModel("assets/snake.glb"),
         .walking_shooter = rl.LoadModel("assets/snake.glb"),
         .flyer = rl.LoadModel("assets/wasp.glb"),
-        .boss = rl.LoadModel("assets/lion.glb"),
+        .boss = switch (boss_type) {
+            .lion => rl.LoadModel("assets/lion.glb"),
+            .hydra => rl.LoadModel("assets/hydra_head.glb"),
+        },
     });
+    if (boss_type == .hydra) {
+        self.hydra_body = rl.LoadModel("assets/hydra_body.glb");
+        try self.models.append(self.hydra_body.?);
+    }
 
     for (self.enemy_models.values) |model_opt| {
         if (model_opt) |model| {
@@ -187,7 +229,10 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
     try load_animation(&self, .shooter, "assets/snake.glb", 0, 2, 4);
     try load_animation(&self, .walking_shooter, "assets/snake.glb", 0, 2, 4);
     try load_animation(&self, .flyer, "assets/wasp.glb", 0, 2, 2);
-    try load_animation(&self, .boss, "assets/lion.glb", 3, 3, 3);
+    switch (boss_type) {
+        .lion => try load_animation(&self, .boss, "assets/lion.glb", 3, 3, 3),
+        .hydra => try load_animation(&self, .boss, "assets/hydra_head.glb", 0, 2, 4),
+    }
 
     self.player = try .init(&self.models, &self.models_animations);
 
@@ -204,21 +249,11 @@ pub fn init(allocator: std.mem.Allocator, level: Level) !Self {
     for (self.level.placeholders.items) |ph| {
         switch (ph.entity) {
             .enemy => |enemy| {
-                try self.enemies.append(EnemyInstance{
-                    .alive = true,
-                    .model = self.enemy_models.get(enemy.type).?,
-                    .animation = self.enemy_animations.get(enemy.type).?.run,
-                    .angle = 0.0,
-                    .enemy = enemy,
-                    .active = true,
-                    .health_points = 100 * enemy.health,
-                    .pos = vec2(@floatFromInt(ph.position.x), @floatFromInt(ph.position.y)),
-                    .radius = 0.3,
-                    .animation_frame = 0,
-                    .inertia = rl.Vector2Zero(),
-                    .shooting_cooldown = 0,
-                    .flyer_move_target = null,
-                });
+                try self.enemies.append(.init(
+                    &self,
+                    vec2(@floatFromInt(ph.position.x), @floatFromInt(ph.position.y)),
+                    enemy,
+                ));
             },
             .player => {
                 self.player.position = vec2(@floatFromInt(ph.position.x), @floatFromInt(ph.position.y));
@@ -346,6 +381,33 @@ pub fn update(self: *Self) !void {
                 } else {
                     e.shooting_cooldown -= delta;
                 }
+            } else if (e.enemy.type == .boss and self.boss_type == .hydra) {
+                if (e.shooting_cooldown <= 0) {
+                    e.shooting_cooldown = 2.3 - (e.enemy.shooting_velocity * 2);
+
+                    const target_rad = c.look_target_rad(e.pos, self.player.position);
+
+                    try self.bullets.append(.{
+                        .to_remove = false,
+                        .dmg = @intFromFloat(e.enemy.damage * 50),
+                        .pos = e.pos,
+                        .vector = rl.Vector2Scale(rl.Vector2Rotate(vec2(0, 1), target_rad - (30 * rl.DEG2RAD)), 0.1),
+                    });
+                    try self.bullets.append(.{
+                        .to_remove = false,
+                        .dmg = @intFromFloat(e.enemy.damage * 50),
+                        .pos = e.pos,
+                        .vector = rl.Vector2Scale(rl.Vector2Rotate(vec2(0, 1), target_rad), 0.1),
+                    });
+                    try self.bullets.append(.{
+                        .to_remove = false,
+                        .dmg = @intFromFloat(e.enemy.damage * 50),
+                        .pos = e.pos,
+                        .vector = rl.Vector2Scale(rl.Vector2Rotate(vec2(0, 1), target_rad + (30 * rl.DEG2RAD)), 0.1),
+                    });
+                } else {
+                    e.shooting_cooldown -= delta;
+                }
             }
 
             if (rl.Vector2Equals(e.inertia, rl.Vector2Zero()) == 0) {
@@ -376,9 +438,11 @@ pub fn update(self: *Self) !void {
                 e.angle = rl.Vector2Angle(vec2(0, 1), rl.Vector2Normalize(rl.Vector2Subtract(e.pos, previous))) * -rl.RAD2DEG;
             }
 
-            e.animation_frame += 1;
-            rl.UpdateModelAnimation(e.model, e.animation, e.animation_frame);
-            if (e.animation_frame >= e.animation.frameCount) e.animation_frame = 0;
+            if (e.animation) |animation| {
+                e.animation_frame += 1;
+                rl.UpdateModelAnimation(e.model, animation, e.animation_frame);
+                if (e.animation_frame >= animation.frameCount) e.animation_frame = 0;
+            }
         }
     }
 
@@ -442,7 +506,14 @@ pub fn render(self: Self) void {
 
         for (self.enemies.items) |e| {
             if (!e.alive) continue;
-            rl.DrawModelEx(e.model, to_world_pos(e.pos), vec3(0, 1, 0), e.angle, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
+            if (e.enemy.type == .boss and self.boss_type == .hydra) {
+                rl.DrawModelEx(self.hydra_body.?, to_world_pos(e.pos), vec3(0, 1, 0), e.angle, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
+                rl.DrawModelEx(e.model, to_world_pos(rl.Vector2Add((e.pos), vec2(-0.5, 0))), vec3(0, 1, 0), e.angle - 30, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
+                rl.DrawModelEx(e.model, to_world_pos(e.pos), vec3(0, 1, 0), e.angle, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
+                rl.DrawModelEx(e.model, to_world_pos(rl.Vector2Add((e.pos), vec2(0.5, 0))), vec3(0, 1, 0), e.angle + 30, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
+            } else {
+                rl.DrawModelEx(e.model, to_world_pos(e.pos), vec3(0, 1, 0), e.angle, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
+            }
         }
 
         for (self.bullets.items) |e| {
