@@ -508,9 +508,9 @@ pub fn render(self: Self) void {
             if (!e.alive) continue;
             if (e.enemy.type == .boss and self.boss_type == .hydra) {
                 rl.DrawModelEx(self.hydra_body.?, to_world_pos(e.pos), vec3(0, 1, 0), e.angle, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
-                rl.DrawModelEx(e.model, to_world_pos(rl.Vector2Add((e.pos), vec2(-0.5, 0))), vec3(0, 1, 0), e.angle - 30, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
+                rl.DrawModelEx(e.model, to_world_pos(rl.Vector2Add((e.pos), vec2(-0.3, 0))), vec3(0, 1, 0), e.angle - 30, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
                 rl.DrawModelEx(e.model, to_world_pos(e.pos), vec3(0, 1, 0), e.angle, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
-                rl.DrawModelEx(e.model, to_world_pos(rl.Vector2Add((e.pos), vec2(0.5, 0))), vec3(0, 1, 0), e.angle + 30, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
+                rl.DrawModelEx(e.model, to_world_pos(rl.Vector2Add((e.pos), vec2(0.3, 0))), vec3(0, 1, 0), e.angle + 30, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
             } else {
                 rl.DrawModelEx(e.model, to_world_pos(e.pos), vec3(0, 1, 0), e.angle, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
             }

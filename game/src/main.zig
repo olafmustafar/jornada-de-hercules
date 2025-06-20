@@ -19,10 +19,13 @@ pub fn main() !void {
     const initial = try scenes.initial_scene(alloc);
     defer initial.deinit();
 
+    const test_scene = try scenes.test_scene(alloc);
+    defer test_scene.deinit();
+
     const levels = try generate_levels(alloc);
     defer for (levels) |lvl| lvl.deinit();
 
-    var world = try World.init(alloc, levels[0], .hydra);
+    var world = try World.init(alloc, test_scene, .hydra);
     defer world.deinit();
 
     var lvl_i: usize = 0;
@@ -96,8 +99,9 @@ fn _test() void {
 
     const model = rl.LoadModel("assets/hydra_body.glb");
     const model2 = rl.LoadModel("assets/hydra_head.glb");
-    // var count: i32 = 0;
-    // const animations = rl.LoadModelAnimations("assets/lion.glb", &count);
+
+    var count: i32 = 0;
+    const animations = rl.LoadModelAnimations("assets/hydra_head.glb", &count);
 
     var camera = rl.Camera{
         .fovy = 60,
@@ -107,7 +111,7 @@ fn _test() void {
         .up = c.vec3up(),
     };
 
-    // var frame: i32 = 0;
+    var frame: i32 = 0;
 
     while (!rl.WindowShouldClose()) {
         rl.BeginDrawing();
@@ -115,8 +119,9 @@ fn _test() void {
         rl.BeginMode3D(camera);
         defer rl.EndMode3D();
 
-        // frame = @mod(frame + 1, animations[3].frameCount);
-        // rl.UpdateModelAnimation(model, animations[3], frame);
+        frame = @mod(frame + 1, animations[4].frameCount);
+        rl.UpdateModelAnimation(model2, animations[4], frame);
+
         rl.ClearBackground(rl.RAYWHITE);
         rl.UpdateCamera(&camera, rl.CAMERA_ORBITAL);
         rl.DrawModel(model, rl.Vector3Zero(), 1, rl.WHITE);

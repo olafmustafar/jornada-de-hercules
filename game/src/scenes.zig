@@ -64,3 +64,34 @@ pub fn initial_scene(alloc: std.mem.Allocator) !Level {
 
     return level;
 }
+
+pub fn test_scene(alloc: std.mem.Allocator) !Level {
+    const empty =
+        \\##############
+        \\#............#
+        \\#............#
+        \\#............#
+        \\#............#
+        \\#............#
+        \\#............#
+        \\#............#
+        \\#............#
+        \\##############
+    ;
+
+    var level = try Level.from_string(alloc, empty);
+
+    try level.room_rects.append(.{ .x = 0, .y = 0, .w = 14, .h = 10 });
+
+    try level.placeholders.append(.{ .position = .init(6, 4), .entity = .{ .player = {} } });
+
+    try level.placeholders.append(.{ .position = .init(6, 2), .entity = .{ .enemy = .{
+        .type = .boss,
+        .health = 0.1,
+        .damage = 0.1,
+        .velocity = 0.1,
+        .shooting_velocity = 0.1,
+    } } });
+
+    return level;
+}
