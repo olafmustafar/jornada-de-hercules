@@ -8,6 +8,12 @@ const rll = @import("rlights.zig");
 const World = @import("World.zig");
 const scenes = @import("scenes.zig");
 
+const LevelArgs = struct {
+    level: contents.Level,
+    boss: World.BossType = .lion,
+    tint: rl.Color = rl.WHITE,
+};
+
 pub fn main() !void {
     rl.SetConfigFlags(rl.FLAG_MSAA_4X_HINT);
     rl.InitWindow(c.window_w, c.window_h, "raylib [core] example - basic window");
@@ -16,41 +22,44 @@ pub fn main() !void {
 
     const alloc = std.heap.c_allocator;
 
-    const initial = try scenes.initial_scene(alloc);
-    defer initial.deinit();
+    const level_args = try generate_levels(alloc);
+    defer for (level_args) |lvl| lvl.level.deinit();
 
-    const test_scene = try scenes.test_scene(alloc);
-    defer test_scene.deinit();
-
-    const levels = try generate_levels(alloc);
-    defer for (levels) |lvl| lvl.deinit();
-
-    var world = try World.init(alloc, test_scene, .hydra);
+    var curr_i: usize = 0;
+    var world = try get_world(alloc, level_args[curr_i]);
     defer world.deinit();
 
-    var lvl_i: usize = 0;
     while (!rl.WindowShouldClose()) {
         try world.update();
         world.render();
 
         if (world.finished) {
-            if (lvl_i == levels.len) {
+            curr_i += 1;
+            if (curr_i == level_args.len) {
                 break;
             }
-
             world.deinit();
-            world = try World.init(alloc, levels[0], .lion);
-            lvl_i += 1;
+            world = try get_world(alloc, level_args[curr_i]);
         }
     }
 }
 
-fn generate_levels(alloc: std.mem.Allocator) ![3]contents.Level {
-    var levels: [3]contents.Level = undefined;
+fn get_world(alloc: std.mem.Allocator, args: LevelArgs) !World {
+    return try World.init(alloc, args.level, args.boss, args.tint);
+}
+
+fn generate_levels(alloc: std.mem.Allocator) ![6]LevelArgs {
+    var levels: [6]LevelArgs = undefined;
 
     var pcg = try PCGManager.init(alloc);
     defer pcg.deinit();
 
+    const yellow = rl.Color{ .r = 255, .g = 235, .b = 179, .a = 0 };
+    const green = rl.Color{ .r = 86, .g = 117, .b = 115, .a = 0 };
+    const light_green = rl.Color{ .r = 227, .g = 255, .b = 163, .a = 0 };
+
+    levels[0].level = try scenes.initial_scene(alloc);
+    levels[0].tint = yellow;
     pcg.context.difficulty_level = 4;
     try pcg.generate(.{ .rooms = .{ .generate = .{} } });
     try pcg.generate(.{ .enemies = .{ .generate = .{} } });
@@ -62,8 +71,13 @@ fn generate_levels(alloc: std.mem.Allocator) ![3]contents.Level {
         .max_branch_diameter = 5,
         .change_direction_chance = 0.25,
     } } });
-    levels[0] = try pcg.retrieve_level();
 
+    levels[1].level = try pcg.retrieve_level();
+    levels[1].tint = yellow;
+    levels[1].boss = .lion;
+
+    levels[2].level = try scenes.second_scene(alloc);
+    levels[2].tint = green;
     pcg.context.difficulty_level = 4;
     try pcg.generate(.{ .enemies = .{ .generate = .{} } });
     try pcg.generate(.{ .architecture = .{ .generate = .{
@@ -74,8 +88,12 @@ fn generate_levels(alloc: std.mem.Allocator) ![3]contents.Level {
         .max_branch_diameter = 1,
         .change_direction_chance = 0.30,
     } } });
-    levels[1] = try pcg.retrieve_level();
+    levels[3].level = try pcg.retrieve_level();
+    levels[3].tint = green;
+    levels[3].boss = .hydra;
 
+    levels[4].level = try scenes.third_scene(alloc);
+    levels[4].tint = light_green;
     pcg.context.difficulty_level = 5;
     try pcg.generate(.{ .enemies = .{ .generate = .{} } });
     try pcg.generate(.{ .architecture = .{ .generate = .{
@@ -86,7 +104,8 @@ fn generate_levels(alloc: std.mem.Allocator) ![3]contents.Level {
         .max_branch_diameter = 5,
         .change_direction_chance = 0.25,
     } } });
-    levels[2] = try pcg.retrieve_level();
+    levels[5].level = try pcg.retrieve_level();
+    levels[5].tint = light_green;
 
     return levels;
 }

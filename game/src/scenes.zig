@@ -45,13 +45,86 @@ pub fn initial_scene(alloc: std.mem.Allocator) !Level {
             ,
             \\Um leão, dizem os camponeses
             \\Não é criatura de carne comum,
-            ,
             \\Suas garras dilaceram ferro.
             \\Sua pele… impenetrável
             ,
             \\Vai, Hércules!
             \\O tempo dos deuses
             \\já não te protege
+        },
+    } } });
+
+    try level.placeholders.append(.{ .position = .init(13, 5), .entity = .{ .item = {} } });
+    try level.placeholders.append(.{ .position = .init(10, 4), .entity = .{ .exit = .up } });
+    try level.placeholders.append(.{ .position = .init(11, 4), .entity = .{ .exit = .up } });
+
+    try level.room_rects.append(.{ .x = 4, .y = 4, .w = 14, .h = 6 });
+    try level.room_rects.append(.{ .x = 4, .y = 10, .w = 14, .h = 8 });
+
+    return level;
+}
+
+pub fn second_scene(alloc: std.mem.Allocator) !Level {
+    var level = try Level.from_string(alloc, spawn);
+
+    try level.placeholders.append(.{ .position = .init(10, 14), .entity = .{ .player = {} } });
+
+    //max 24 characters
+    try level.placeholders.append(.{ .position = .init(8, 5), .entity = .{ .npc = .{
+        .name = "Rei Euristeu",
+        .dialog = &[_][]const u8{
+            \\Cumpriste com suor e 
+            \\sangue o primeiro fardo,
+            \\domando o Leão de Neméia.
+            \\
+            \\Mas tua pena não se encerra — não ainda
+            ,
+            \\teu segundo trabalho se ergue 
+            \\das águas infectas de Lerna.
+            \\Lá, sob o lodo pestilento 
+            \\e os juncos envenenados,
+            \\rasteja a Hidra
+            ,
+            \\Vai, portanto, ao pântano amaldiçoado. 
+            \\Que teus passos não vacilem 
+            \\no charco traiçoeiro!
+        },
+    } } });
+
+    try level.placeholders.append(.{ .position = .init(13, 5), .entity = .{ .item = {} } });
+    try level.placeholders.append(.{ .position = .init(10, 4), .entity = .{ .exit = .up } });
+    try level.placeholders.append(.{ .position = .init(11, 4), .entity = .{ .exit = .up } });
+
+    try level.room_rects.append(.{ .x = 4, .y = 4, .w = 14, .h = 6 });
+    try level.room_rects.append(.{ .x = 4, .y = 10, .w = 14, .h = 8 });
+
+    return level;
+}
+
+pub fn third_scene(alloc: std.mem.Allocator) !Level {
+    var level = try Level.from_string(alloc, spawn);
+
+    try level.placeholders.append(.{ .position = .init(10, 14), .entity = .{ .player = {} } });
+
+    //max 24 characters
+    try level.placeholders.append(.{ .position = .init(8, 5), .entity = .{ .npc = .{
+        .name = "Rei Euristeu",
+        .dialog = &[_][]const u8{
+            \\tua jornada não se encerra com a morte 
+            \\nem do leão, nem da serpente
+            ,
+            \\Ao norte da Arcádia, 
+            \\sob as sombras dos pinheiros eternos, 
+            \\vagueia um ser que nenhum caçador jamais tocou 
+            \\a Corça de Cerínia.
+            ,
+
+            \\Não a mates. Não a firas. 
+            \\Captura-a viva. Sem trapaça, sem crueldade. 
+            \\Tua força não te bastará.
+            ,
+            \\Vai... e que tuas pegadas 
+            \\não desapareçam na floresta antes de teu retorno
         },
     } } });
 

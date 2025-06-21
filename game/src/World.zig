@@ -22,7 +22,7 @@ const glsl_version: i32 = if (builtin.target.cpu.arch.isWasm()) 100 else 330;
 var g_world: ?*Self = undefined;
 
 const Self = @This();
-const BossType = enum {
+pub const BossType = enum {
     lion,
     hydra,
 };
@@ -103,6 +103,7 @@ const window_h = 600;
 const max_spots = 3;
 
 level: Level,
+level_tint: rl.Color,
 tile_models: std.EnumArray(Tile, ?rl.Model),
 models: std.ArrayList(rl.Model),
 models_animations: std.ArrayList(Animations),
@@ -138,9 +139,10 @@ dialog: ?Dialog,
 
 finished: bool,
 
-pub fn init(allocator: std.mem.Allocator, level: Level, boss_type: BossType) !Self {
+pub fn init(allocator: std.mem.Allocator, level: Level, boss_type: BossType, level_tint: rl.Color) !Self {
     var self: Self = undefined;
     self.level = level;
+    self.level_tint = level_tint;
     self.boss_type = boss_type;
     self.models = std.ArrayList(rl.Model).init(allocator);
     self.models_animations = .init(allocator);
@@ -492,13 +494,13 @@ pub fn render(self: Self) void {
                 if (self.tile_models.get(tile)) |model| {
                     if (tile == .door) {
                         if (self.level.tilemap.get(x + 1, y).* == .door) {
-                            rl.DrawModelEx(model, to_world_pos(vec2(@as(f32, @floatFromInt(x)) + 0.5, @floatFromInt(y))), vec3(0.0, 1.0, 0.0), 90.0, rl.Vector3One(), rl.WHITE);
+                            rl.DrawModelEx(model, to_world_pos(vec2(@as(f32, @floatFromInt(x)) + 0.5, @floatFromInt(y))), vec3(0.0, 1.0, 0.0), 90.0, rl.Vector3One(), self.level_tint);
                         }
                         if (self.level.tilemap.get(x, y + 1).* == .door) {
-                            rl.DrawModel(model, Self.to_world_pos(vec2(@floatFromInt(x), @as(f32, @floatFromInt(y)) + 0.5)), 1.0, rl.WHITE);
+                            rl.DrawModel(model, Self.to_world_pos(vec2(@floatFromInt(x), @as(f32, @floatFromInt(y)) + 0.5)), 1.0, self.level_tint);
                         }
                     } else {
-                        rl.DrawModel(model, Self.to_world_pos(vec2(@floatFromInt(x), @floatFromInt(y))), 1.0, rl.WHITE);
+                        rl.DrawModel(model, Self.to_world_pos(vec2(@floatFromInt(x), @floatFromInt(y))), 1.0, self.level_tint);
                     }
                 }
             }
