@@ -25,11 +25,10 @@ pub const Light = struct {
     attenuationLoc: i32,
 };
 
-var lightsCount: i32 = 0;
-
 pub fn CreateLight(ltype: Light.Type, position: rl.Vector3, target: rl.Vector3, color: rl.Color, shader: rl.Shader) Light {
     var light: Light = undefined;
 
+    var lightsCount: i32 = 0;
     if (lightsCount < MAX_LIGHTS) {
         light.enabled = true;
         light.type = ltype;

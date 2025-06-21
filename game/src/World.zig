@@ -139,7 +139,13 @@ dialog: ?Dialog,
 
 finished: bool,
 
-pub fn init(allocator: std.mem.Allocator, level: Level, boss_type: BossType, level_tint: rl.Color) !Self {
+pub fn init(
+    allocator: std.mem.Allocator,
+    level: Level,
+    boss_type: BossType,
+    level_tint: rl.Color,
+    tile_models: std.EnumArray(Tile, ?[]const u8),
+) !Self {
     var self: Self = undefined;
     self.level = level;
     self.level_tint = level_tint;
@@ -161,14 +167,14 @@ pub fn init(allocator: std.mem.Allocator, level: Level, boss_type: BossType, lev
         .fovy = 60.0,
         .projection = rl.CAMERA_PERSPECTIVE,
     };
+
     self.shader = rl.LoadShader(
         rl.TextFormat("assets/shaders/glsl%i/lighting.vs", glsl_version),
         rl.TextFormat("assets/shaders/glsl%i/lighting.fs", glsl_version),
     );
-
-    self.light = rll.CreateLight(rll.Light.Type.point, rl.Vector3Zero(), rl.Vector3Zero(), rl.WHITE, self.shader);
     const ambientLoc = rl.GetShaderLocation(self.shader, "ambient");
     rl.SetShaderValue(self.shader, ambientLoc, &[4]f32{ 2.0, 2.0, 2.0, 10.0 }, rl.SHADER_UNIFORM_VEC4);
+    self.light = rll.CreateLight(rll.Light.Type.point, rl.Vector3Zero(), rl.Vector3Zero(), rl.WHITE, self.shader);
 
     self.spotlight = rl.LoadShader(null, rl.TextFormat("assets/shaders/glsl%i/spotlight.fs", glsl_version));
     const wloc = rl.GetShaderLocation(self.spotlight, "screenWidth");
@@ -186,15 +192,15 @@ pub fn init(allocator: std.mem.Allocator, level: Level, boss_type: BossType, lev
     try self.models.append(self.door_closed);
 
     self.tile_models = .init(.{
-        .empty = null,
-        .plane = rl.LoadModel("assets/plane_sqrt.glb"),
-        .mountain = rl.LoadModel("assets/mountain_sqr.glb"),
-        .sand = rl.LoadModel("assets/sand_sqr.glb"),
-        .trees = rl.LoadModel("assets/trees_srq.glb"),
-        .ocean = rl.LoadModel("assets/ocean_sqr.glb"),
-        .wall = rl.LoadModel("assets/wall_sqr.glb"),
-        .door = null,
-        .size = null,
+        .empty = if (tile_models.get(.empty) != null) rl.LoadModel(@ptrCast(tile_models.get(.empty).?)) else null,
+        .plane = if (tile_models.get(.plane) != null) rl.LoadModel(@ptrCast(tile_models.get(.plane).?)) else null,
+        .mountain = if (tile_models.get(.mountain) != null) rl.LoadModel(@ptrCast(tile_models.get(.mountain).?)) else null,
+        .sand = if (tile_models.get(.sand) != null) rl.LoadModel(@ptrCast(tile_models.get(.sand).?)) else null,
+        .trees = if (tile_models.get(.trees) != null) rl.LoadModel(@ptrCast(tile_models.get(.trees).?)) else null,
+        .ocean = if (tile_models.get(.ocean) != null) rl.LoadModel(@ptrCast(tile_models.get(.ocean).?)) else null,
+        .wall = if (tile_models.get(.wall) != null) rl.LoadModel(@ptrCast(tile_models.get(.wall).?)) else null,
+        .door = if (tile_models.get(.door) != null) rl.LoadModel(@ptrCast(tile_models.get(.door).?)) else null,
+        .size = if (tile_models.get(.size) != null) rl.LoadModel(@ptrCast(tile_models.get(.size).?)) else null,
     });
 
     for (self.tile_models.values) |model_opt| {
@@ -284,7 +290,6 @@ pub fn init(allocator: std.mem.Allocator, level: Level, boss_type: BossType, lev
 }
 
 pub fn deinit(self: Self) void {
-    std.debug.print("DEINIT\n", .{});
     rl.UnloadShader(self.shader);
     rl.UnloadShader(self.spotlight);
     for (self.models.items) |model| rl.UnloadModel(model);
@@ -301,6 +306,12 @@ pub fn deinit(self: Self) void {
 
 pub fn update(self: *Self) !void {
     set(self);
+
+    if (rl.IsKeyPressed(rl.KEY_K)) {
+        self.finished = true;
+        self.player.alive = false;
+        return;
+    }
 
     self.curr_room = null;
     for (self.level.room_rects.items) |room_rec| {
@@ -494,13 +505,13 @@ pub fn render(self: Self) void {
                 if (self.tile_models.get(tile)) |model| {
                     if (tile == .door) {
                         if (self.level.tilemap.get(x + 1, y).* == .door) {
-                            rl.DrawModelEx(model, to_world_pos(vec2(@as(f32, @floatFromInt(x)) + 0.5, @floatFromInt(y))), vec3(0.0, 1.0, 0.0), 90.0, rl.Vector3One(), self.level_tint);
+                            rl.DrawModelEx(model, to_world_pos(vec2(@as(f32, @floatFromInt(x)) + 0.5, @floatFromInt(y))), vec3(0.0, 1.0, 0.0), 90.0, rl.Vector3One(), rl.WHITE);
                         }
                         if (self.level.tilemap.get(x, y + 1).* == .door) {
-                            rl.DrawModel(model, Self.to_world_pos(vec2(@floatFromInt(x), @as(f32, @floatFromInt(y)) + 0.5)), 1.0, self.level_tint);
+                            rl.DrawModel(model, Self.to_world_pos(vec2(@floatFromInt(x), @as(f32, @floatFromInt(y)) + 0.5)), 1.0, rl.WHITE);
                         }
                     } else {
-                        rl.DrawModel(model, Self.to_world_pos(vec2(@floatFromInt(x), @floatFromInt(y))), 1.0, self.level_tint);
+                        rl.DrawModel(model, Self.to_world_pos(vec2(@floatFromInt(x), @floatFromInt(y))), 1.0, rl.WHITE);
                     }
                 }
             }

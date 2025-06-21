@@ -12,6 +12,7 @@ const LevelArgs = struct {
     level: contents.Level,
     boss: World.BossType = .lion,
     tint: rl.Color = rl.WHITE,
+    tiles: std.EnumArray(contents.Tile, ?[]const u8),
 };
 
 pub fn main() !void {
@@ -45,10 +46,33 @@ pub fn main() !void {
 }
 
 fn get_world(alloc: std.mem.Allocator, args: LevelArgs) !World {
-    return try World.init(alloc, args.level, args.boss, args.tint);
+    return try World.init(alloc, args.level, args.boss, args.tint, args.tiles);
 }
 
 fn generate_levels(alloc: std.mem.Allocator) ![6]LevelArgs {
+    const normal_tiles = std.EnumArray(contents.Tile, ?[]const u8).init(.{
+        .empty = null,
+        .plane = "assets/plane_sqrt.glb",
+        .mountain = "assets/mountain_sqr.glb",
+        .sand = "assets/sand_sqr.glb",
+        .trees = "assets/trees_sqr.glb",
+        .ocean = "assets/ocean_sqr.glb",
+        .wall = "assets/wall_sqr.glb",
+        .door = null,
+        .size = null,
+    });
+    const swamp_tiles = std.EnumArray(contents.Tile, ?[]const u8).init(.{
+        .empty = null,
+        .plane = "assets/plane_sqrt_swamp.glb",
+        .mountain = "assets/mountain_sqr_swamp.glb",
+        .sand = "assets/plane_sqrt_swamp.glb",
+        .trees = "assets/trees_sqr_swamp.glb",
+        .ocean = "assets/ocean_sqr_swamp.glb",
+        .wall = "assets/wall_sqr.glb",
+        .door = null,
+        .size = null,
+    });
+
     var levels: [6]LevelArgs = undefined;
 
     var pcg = try PCGManager.init(alloc);
@@ -60,6 +84,7 @@ fn generate_levels(alloc: std.mem.Allocator) ![6]LevelArgs {
 
     levels[0].level = try scenes.initial_scene(alloc);
     levels[0].tint = yellow;
+    levels[0].tiles = normal_tiles;
     pcg.context.difficulty_level = 4;
     try pcg.generate(.{ .rooms = .{ .generate = .{} } });
     try pcg.generate(.{ .enemies = .{ .generate = .{} } });
@@ -74,10 +99,12 @@ fn generate_levels(alloc: std.mem.Allocator) ![6]LevelArgs {
 
     levels[1].level = try pcg.retrieve_level();
     levels[1].tint = yellow;
+    levels[1].tiles = normal_tiles;
     levels[1].boss = .lion;
 
     levels[2].level = try scenes.second_scene(alloc);
     levels[2].tint = green;
+    levels[2].tiles = swamp_tiles;
     pcg.context.difficulty_level = 4;
     try pcg.generate(.{ .enemies = .{ .generate = .{} } });
     try pcg.generate(.{ .architecture = .{ .generate = .{
@@ -91,9 +118,11 @@ fn generate_levels(alloc: std.mem.Allocator) ![6]LevelArgs {
     levels[3].level = try pcg.retrieve_level();
     levels[3].tint = green;
     levels[3].boss = .hydra;
+    levels[3].tiles = swamp_tiles;
 
     levels[4].level = try scenes.third_scene(alloc);
     levels[4].tint = light_green;
+    levels[4].tiles = normal_tiles;
     pcg.context.difficulty_level = 5;
     try pcg.generate(.{ .enemies = .{ .generate = .{} } });
     try pcg.generate(.{ .architecture = .{ .generate = .{
@@ -106,6 +135,7 @@ fn generate_levels(alloc: std.mem.Allocator) ![6]LevelArgs {
     } } });
     levels[5].level = try pcg.retrieve_level();
     levels[5].tint = light_green;
+    levels[5].tiles = normal_tiles;
 
     return levels;
 }
