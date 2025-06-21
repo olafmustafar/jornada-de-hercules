@@ -332,7 +332,7 @@ pub fn update(self: *Self) !void {
     rll.UpdateLightValues(self.shader, self.light);
 
     for (&self.spotlights) |*spot| {
-        self.finished = self.player.exiting_direction != null and spot.radius == 0;
+        self.finished = (self.player.exiting_direction != null or !self.player.alive) and spot.radius == 0;
 
         if (self.spotlight_open) {
             spot.radius += 5;

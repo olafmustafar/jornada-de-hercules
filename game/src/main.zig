@@ -34,10 +34,10 @@ pub fn main() !void {
         world.render();
 
         if (world.finished) {
-            curr_i += 1;
-            if (curr_i == level_args.len) {
-                break;
-            }
+            if (world.player.alive) curr_i += 1;
+
+            if (curr_i == level_args.len) break;
+
             world.deinit();
             world = try get_world(alloc, level_args[curr_i]);
         }

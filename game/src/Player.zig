@@ -65,7 +65,10 @@ pub fn update(self: *Self) void {
         if (self.animation_counter < self.current_animation.frameCount - 1) {
             self.animation_counter += 1;
             rl.UpdateModelAnimation(self.model, self.current_animation, self.animation_counter);
+        }else {
+            World.get().spotlight_open = false;
         }
+        
         return;
     }
     if (self.immunity_frames > 0) self.immunity_frames -= delta;
