@@ -16,12 +16,20 @@ const LevelArgs = struct {
 };
 
 pub fn main() !void {
+    const alloc = std.heap.c_allocator;
+
+
     rl.SetConfigFlags(rl.FLAG_MSAA_4X_HINT);
     rl.InitWindow(c.window_w, c.window_h, "raylib [core] example - basic window");
     rl.SetTargetFPS(60);
     defer rl.CloseWindow();
 
-    const alloc = std.heap.c_allocator;
+    rl.InitAudioDevice();
+    defer rl.CloseAudioDevice();
+    const music = rl.LoadMusicStream("assets/Woodland-Fantasy.wav");
+    defer rl.UnloadMusicStream(music);
+    var timePlayed : f32 = undefined;
+    rl.PlayMusicStream(music);
 
     const level_args = try generate_levels(alloc);
     defer for (level_args) |lvl| lvl.level.deinit();
@@ -31,6 +39,11 @@ pub fn main() !void {
     defer world.deinit();
 
     while (!rl.WindowShouldClose()) {
+        rl.UpdateMusicStream(music);
+
+        timePlayed = rl.GetMusicTimePlayed(music) / rl.GetMusicTimeLength(music);
+        if (timePlayed > 1.0) timePlayed = 1.0;
+
         try world.update();
         world.render();
 
@@ -160,34 +173,19 @@ fn _test() void {
     rl.SetTargetFPS(60);
     defer rl.CloseWindow();
 
-    const model = rl.LoadModel("assets/hydra_body.glb");
-    const model2 = rl.LoadModel("assets/hydra_head.glb");
+    rl.InitAudioDevice();
+    defer rl.CloseAudioDevice();
 
-    var count: i32 = 0;
-    const animations = rl.LoadModelAnimations("assets/hydra_head.glb", &count);
+    const music = rl.LoadMusicStream("assets/Woodland-Fantasy.wav");
+    defer rl.UnloadMusicStream(music);
 
-    var camera = rl.Camera{
-        .fovy = 60,
-        .position = c.vec3xyz(5),
-        .target = rl.Vector3Zero(),
-        .projection = rl.CAMERA_PERSPECTIVE,
-        .up = c.vec3up(),
-    };
-
-    var frame: i32 = 0;
+    var timePlayed : f32 = undefined;
+    rl.PlayMusicStream(music);
 
     while (!rl.WindowShouldClose()) {
-        rl.BeginDrawing();
-        defer rl.EndDrawing();
-        rl.BeginMode3D(camera);
-        defer rl.EndMode3D();
+        rl.UpdateMusicStream(music);
 
-        frame = @mod(frame + 1, animations[4].frameCount);
-        rl.UpdateModelAnimation(model2, animations[4], frame);
-
-        rl.ClearBackground(rl.RAYWHITE);
-        rl.UpdateCamera(&camera, rl.CAMERA_ORBITAL);
-        rl.DrawModel(model, rl.Vector3Zero(), 1, rl.WHITE);
-        rl.DrawModel(model2, rl.Vector3Zero(), 1, rl.WHITE);
+        timePlayed = rl.GetMusicTimePlayed(music) / rl.GetMusicTimeLength(music);
+        if (timePlayed > 1.0) timePlayed = 1.0;
     }
 }
