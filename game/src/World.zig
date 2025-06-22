@@ -25,6 +25,7 @@ const Self = @This();
 pub const BossType = enum {
     lion,
     hydra,
+    stag,
 };
 
 const Bullet = struct {
@@ -70,9 +71,18 @@ const EnemyInstance = struct {
             ei.animation = anim.run;
         }
         if (enemy.type == .boss and self.boss_type == .hydra) {
-            ei.radius = 0.5;
-            ei.enemy.velocity = 0;
+            switch (self.boss_type) {
+                .lion => {},
+                .hydra => {
+                    ei.radius = 0.5;
+                    ei.enemy.velocity *= 0.5;
+                    ei.enemy.health = 40;
+                },
+                .stag => {
+                },
+            }
         }
+
         return ei;
     }
 };
@@ -218,6 +228,7 @@ pub fn init(
         .boss = switch (boss_type) {
             .lion => rl.LoadModel("assets/lion.glb"),
             .hydra => rl.LoadModel("assets/hydra_head.glb"),
+            .stag => rl.LoadModel("assets/stag.glb"),
         },
     });
     if (boss_type == .hydra) {
@@ -240,6 +251,7 @@ pub fn init(
     switch (boss_type) {
         .lion => try load_animation(&self, .boss, "assets/lion.glb", 3, 3, 3),
         .hydra => try load_animation(&self, .boss, "assets/hydra_head.glb", 0, 2, 4),
+        .stag => try load_animation(&self, .boss, "assets/stag.glb", 4, 4, 4),
     }
 
     self.player = try .init(&self.models, &self.models_animations);
@@ -429,7 +441,7 @@ pub fn update(self: *Self) !void {
                 e.inertia = rl.Vector2Scale(e.inertia, 0.5);
             } else if (rl.CheckCollisionCircles(self.player.position, self.player.radius, e.pos, e.radius)) {
                 self.player.take_hit(@intFromFloat(e.enemy.damage * 50));
-            } else if (e.enemy.type == .flyer) {
+            } else if (e.enemy.type == .flyer or (e.enemy.type == .boss and self.boss_type == .stag)) {
                 const previous = e.pos;
                 if (e.flyer_move_target == null or rl.Vector2Equals(e.flyer_move_target.?, e.pos) == 1) {
                     var new_target = e.pos;
@@ -443,6 +455,12 @@ pub fn update(self: *Self) !void {
                 e.flyer_move_target = rl.Vector2MoveTowards(e.flyer_move_target.?, e.pos, 0.1 * delta);
                 e.pos = rl.Vector2MoveTowards(e.pos, e.flyer_move_target.?, 5 * e.enemy.velocity * delta);
                 e.pos = self.solve_collisions_flyer(e.pos, e.radius);
+                e.angle = rl.Vector2Angle(vec2(0, 1), rl.Vector2Normalize(rl.Vector2Subtract(e.pos, previous))) * -rl.RAD2DEG;
+            } else if (e.enemy.type == .boss and self.boss_type == .hydra) {
+                const previous = e.pos;
+                const room = self.curr_room.?;
+                e.pos = rl.Vector2MoveTowards(e.pos, vec2(room.x + (room.width / 2) - 0.5, room.y + (room.height / 2)), 5 * e.enemy.velocity * delta);
+                e.pos = self.solve_collisions(e.pos, e.radius);
                 e.angle = rl.Vector2Angle(vec2(0, 1), rl.Vector2Normalize(rl.Vector2Subtract(e.pos, previous))) * -rl.RAD2DEG;
             } else {
                 const previous = e.pos;
