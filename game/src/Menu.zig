@@ -1,9 +1,11 @@
 const std = @import("std");
 const c = @import("commons.zig");
 const rl = @import("raylib.zig");
+const rll = @import("rlights.zig");
+const builtin = @import("builtin");
 
 const Self = @This();
-
+const glsl_version: i32 = if (builtin.target.cpu.arch.isWasm()) 100 else 330;
 const intro_text =
     \\Dizem que Hércules foi o mais forte dos homens.
     \\Dizem que era filho de Zeus, senhor dos céus.
@@ -39,30 +41,63 @@ const intro_text =
 ;
 const State = enum { menu, intro_text };
 
-start: bool = false,
+finished: bool = false,
+sound_enabled: bool,
 state: State,
 
+background: rl.Model,
+animation: struct { [*c]rl.ModelAnimation, i32 },
+frame: i32,
+camera: rl.Camera,
 image: rl.Image,
 texture: rl.Texture,
 title_rotation: f32,
 
+shader: rl.Shader,
+light: rll.Light,
+
 start_btn: rl.Rectangle,
 
-sound_enabled: bool,
 sound_btn: rl.Rectangle,
 intro_text_offset: f32,
 intro_text_linecount: i32,
 
 pub fn init() Self {
     var self: Self = undefined;
+
+    self.camera = .{
+        .fovy = 60,
+        .position = c.vec3(7, 5, 4),
+        .target = rl.Vector3Zero(),
+        .projection = rl.CAMERA_PERSPECTIVE,
+        .up = c.vec3up(),
+    };
+
+    self.shader = rl.LoadShader(
+        rl.TextFormat("assets/shaders/glsl%i/lighting.vs", glsl_version),
+        rl.TextFormat("assets/shaders/glsl%i/lighting.fs", glsl_version),
+    );
+    const ambientLoc = rl.GetShaderLocation(self.shader, "ambient");
+    rl.SetShaderValue(self.shader, ambientLoc, &[4]f32{ 3.0, 3.0, 3.0, 10.0 }, rl.SHADER_UNIFORM_VEC4);
+    self.light = rll.CreateLight(rll.Light.Type.point, rl.Vector3Zero(), rl.Vector3Zero(), rl.WHITE, self.shader);
+
+    self.background = rl.LoadModel("assets/menu.glb");
+    self.background.materials[1].shader = self.shader;
+    self.background.materials[2].shader = self.shader;
+    self.background.materials[3].shader = self.shader;
+    var animation_count: i32 = 0;
+    const animation = rl.LoadModelAnimations("assets/menu.glb", &animation_count);
+    self.animation = .{ animation, animation_count };
+    self.frame = 0;
+
+    self.finished = false;
+    self.sound_enabled = true;
+    self.state = .menu;
     self.image = rl.LoadImage("assets/title.png");
     self.texture = rl.LoadTextureFromImage(self.image);
     self.title_rotation = 0;
     self.start_btn = rl.Rectangle{ .width = 200, .height = 50, .x = (c.window_w - 200) / 2, .y = c.window_h - 160 };
     self.sound_btn = rl.Rectangle{ .width = 200, .height = 50, .x = (c.window_w - 200) / 2, .y = c.window_h - 100 };
-    self.sound_enabled = true;
-    self.state = .menu;
-    self.start = false;
     self.intro_text_offset = c.window_h;
     self.intro_text_linecount = blk: {
         var count: i32 = 0;
@@ -76,6 +111,8 @@ pub fn init() Self {
 }
 
 pub fn deinit(self: Self) void {
+    rl.UnloadModel(self.background);
+    rl.UnloadModelAnimations(self.animation.@"0", self.animation.@"1");
     rl.UnloadTexture(self.texture);
     rl.UnloadImage(self.image);
 }
@@ -84,6 +121,7 @@ pub fn process(self: *Self) void {
     const delta = rl.GetFrameTime();
     const wf = @as(f32, @floatFromInt(self.texture.width));
     const hf = @as(f32, @floatFromInt(self.texture.height));
+
     switch (self.state) {
         .menu => {
             self.title_rotation += 2 * delta;
@@ -101,14 +139,30 @@ pub fn process(self: *Self) void {
             self.intro_text_offset -= 20 * delta;
 
             if (@as(i32, @intFromFloat(self.intro_text_offset)) <= self.intro_text_linecount * -23) {
+                std.debug.print("end", .{});
             }
         },
+        .black_screen => {
+        }
     }
+
+    self.light.position = rl.Vector3Add(self.camera.position, c.vec3(5, 5, 5));
+    rll.UpdateLightValues(self.shader, self.light);
+
+    self.frame = @mod(self.frame + 1, self.animation.@"0"[9].frameCount);
+    rl.UpdateModelAnimation(self.background, self.animation.@"0"[9], self.frame);
+
     rl.BeginDrawing();
     defer rl.EndDrawing();
 
-    rl.ClearBackground(rl.LIME);
+    rl.ClearBackground(rl.SKYBLUE);
 
+    {
+        rl.BeginMode3D(self.camera);
+        defer rl.EndMode3D();
+        rl.UpdateCamera(&self.camera, rl.CAMERA_CUSTOM);
+        rl.DrawModel(self.background, rl.Vector3Zero(), 1.0, rl.WHITE);
+    }
     switch (self.state) {
         .menu => {
             rl.DrawTexturePro(
