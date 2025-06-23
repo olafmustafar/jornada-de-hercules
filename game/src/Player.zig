@@ -2,6 +2,7 @@ const std = @import("std");
 const rl = @import("raylib.zig");
 const World = @import("World.zig");
 const c = @import("commons.zig");
+const AudioMgr = @import("AudioMgr.zig");
 
 const Self = @This();
 pub const max_health = 100;
@@ -65,10 +66,10 @@ pub fn update(self: *Self) void {
         if (self.animation_counter < self.current_animation.frameCount - 1) {
             self.animation_counter += 1;
             rl.UpdateModelAnimation(self.model, self.current_animation, self.animation_counter);
-        }else {
+        } else {
             World.get().spotlight_open = false;
         }
-        
+
         return;
     }
     if (self.immunity_frames > 0) self.immunity_frames -= delta;
@@ -151,12 +152,15 @@ pub fn update(self: *Self) void {
 
 fn attack(self: *Self) void {
     const world = World.get();
+    rl.PlaySound(AudioMgr.get().swoosh);
     for (world.enemies.items) |*e| {
-        if (self.check_hit_collision(e.pos, e.radius)) {
+        if (e.alive and self.check_hit_collision(e.pos, e.radius)) {
             e.health_points -= 10;
             if (e.health_points <= 0) {
+                rl.PlaySound(AudioMgr.get().enemy_die);
                 e.alive = false;
             } else {
+                rl.PlaySound(AudioMgr.get().hit);
                 const angl = self.look_angle();
                 e.inertia = rl.Vector2Scale(c.vec2(rl.cosf(angl), rl.sinf(angl)), 0.8);
             }
@@ -178,6 +182,7 @@ fn look_angle(self: Self) f32 {
 
 pub fn take_hit(self: *Self, dmg: i32) void {
     if (self.alive and self.immunity_frames <= 0) {
+        rl.PlaySound(AudioMgr.get().hit);
         self.health = self.health - dmg;
         if (self.health <= 0) {
             self.alive = false;

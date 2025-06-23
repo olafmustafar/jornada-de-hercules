@@ -9,7 +9,7 @@ const glsl_version: i32 = if (builtin.target.cpu.arch.isWasm()) 100 else 330;
 const intro_text =
     \\Dizem que Hércules foi o mais forte dos homens.
     \\Dizem que era filho de Zeus, senhor dos céus.
-    \\Mas o que raramente se diz… é o preço que ele pagou 
+    \\Mas o que raramente se diz, é o preço que ele pagou 
     \\ por carregar esse sangue divino.
     \\
     \\Desde o nascimento, Hera, esposa de Zeus, o odiava.
@@ -26,20 +26,14 @@ const intro_text =
     \\Matou sua esposa. Seus filhos. Com suas próprias
     \\ mãos.
     \\
-    \\
-    \\Quando a razão voltou, o mundo já estava destruído 
-    \\ ao seu redor.
-    \\E o peso daquela tragédia o esmagava mais do que 
-    \\ qualquer montanha.
-    \\
-    \\Buscando perdão — ou pelo menos, alívio —, Hércules 
+    \\Buscando perdão - ou pelo menos, alívio -, Hércules 
     \\ foi até o oráculo de Delfos.
     \\E ali recebeu sua sentença:
     \\Deveria servir a Euristeu, rei de Micenas.
     \\Não como guerreiro, mas como servo. E cumprir doze 
     \\ trabalhos impossíveis ...
 ;
-const State = enum { menu, intro_text };
+const State = enum { menu, intro_text, black_screen };
 
 finished: bool = false,
 sound_enabled: bool,
@@ -61,6 +55,7 @@ start_btn: rl.Rectangle,
 sound_btn: rl.Rectangle,
 intro_text_offset: f32,
 intro_text_linecount: i32,
+black_screen_alpha: f32,
 
 pub fn init() Self {
     var self: Self = undefined;
@@ -106,6 +101,7 @@ pub fn init() Self {
         }
         break :blk count;
     };
+    self.black_screen_alpha = 0;
 
     return self;
 }
@@ -136,14 +132,21 @@ pub fn process(self: *Self) void {
             }
         },
         .intro_text => {
-            self.intro_text_offset -= 20 * delta;
-
+            if (rl.IsMouseButtonDown(0)) {
+                self.intro_text_offset -= 230 * delta;
+            } else {
+                self.intro_text_offset -= 25 * delta;
+            }
             if (@as(i32, @intFromFloat(self.intro_text_offset)) <= self.intro_text_linecount * -23) {
-                std.debug.print("end", .{});
+                self.state = .black_screen;
             }
         },
         .black_screen => {
-        }
+            self.black_screen_alpha = self.black_screen_alpha + (0.5 * delta);
+            if (self.black_screen_alpha > 1) {
+                self.finished = true;
+            }
+        },
     }
 
     self.light.position = rl.Vector3Add(self.camera.position, c.vec3(5, 5, 5));
@@ -184,6 +187,11 @@ pub fn process(self: *Self) void {
         .intro_text => {
             rl.DrawRectangle(100, 0, c.window_w - 200, c.window_h, rl.Color{ .r = 0x00, .g = 0x00, .b = 0x00, .a = 0xaa });
             rl.DrawText(intro_text, 110, @intFromFloat(self.intro_text_offset), 20, rl.WHITE);
+        },
+        .black_screen => {
+            const alpha: u8 = @intFromFloat(rl.Clamp(self.black_screen_alpha, 0, 1) * 0xff);
+            rl.DrawRectangle(100, 0, c.window_w - 200, c.window_h, rl.Color{ .r = 0x00, .g = 0x00, .b = 0x00, .a = 0xaa });
+            rl.DrawRectangle(0, 0, c.window_w, c.window_h, rl.Color{ .r = 0x00, .g = 0x00, .b = 0x00, .a = alpha });
         },
     }
 }

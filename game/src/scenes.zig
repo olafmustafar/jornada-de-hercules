@@ -77,7 +77,8 @@ pub fn second_scene(alloc: std.mem.Allocator) !Level {
             \\sangue o primeiro fardo,
             \\domando o Leão de Neméia.
             \\
-            \\Mas tua pena não se encerra — não ainda
+            \\Mas tua pena não se encerra
+            \\ - não ainda
             ,
             \\teu segundo trabalho se ergue 
             \\das águas infectas de Lerna.
@@ -85,9 +86,10 @@ pub fn second_scene(alloc: std.mem.Allocator) !Level {
             \\e os juncos envenenados,
             \\rasteja a Hidra
             ,
-            \\Vai, portanto, ao pântano amaldiçoado. 
+            \\Vai, portanto, ao pântano 
+            \\ amaldiçoado. 
             \\Que teus passos não vacilem 
-            \\no charco traiçoeiro!
+            \\ no charco traiçoeiro!
         },
     } } });
 
@@ -110,21 +112,26 @@ pub fn third_scene(alloc: std.mem.Allocator) !Level {
     try level.placeholders.append(.{ .position = .init(8, 5), .entity = .{ .npc = .{
         .name = "Rei Euristeu",
         .dialog = &[_][]const u8{
-            \\tua jornada não se encerra com a morte 
+            \\tua jornada não se 
+            \\ encerra com a morte 
             \\nem do leão, nem da serpente
             ,
             \\Ao norte da Arcádia, 
-            \\sob as sombras dos pinheiros eternos, 
-            \\vagueia um ser que nenhum caçador jamais tocou 
+            \\sob as sombras dos 
+            \\ pinheiros eternos, 
+            \\vagueia um ser que 
+            \\ nenhum caçador jamais tocou 
             \\a Corça de Cerínia.
             ,
 
             \\Não a mates. Não a firas. 
-            \\Captura-a viva. Sem trapaça, sem crueldade. 
+            \\Captura-a viva. 
+            \\ Sem trapaça, sem crueldade. 
             \\Tua força não te bastará.
             ,
             \\Vai... e que tuas pegadas 
-            \\não desapareçam na floresta antes de teu retorno
+            \\não desapareçam na floresta
+            \\ antes de teu retorno
         },
     } } });
 

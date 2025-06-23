@@ -8,6 +8,7 @@ const rll = @import("rlights.zig");
 const World = @import("World.zig");
 const scenes = @import("scenes.zig");
 const Menu = @import("Menu.zig");
+const AudioMgr = @import("AudioMgr.zig");
 
 const LevelArgs = struct {
     level: contents.Level,
@@ -17,45 +18,58 @@ const LevelArgs = struct {
 };
 
 pub fn main() !void {
-    _test();
-    // const alloc = std.heap.c_allocator;
-    //
-    // rl.SetConfigFlags(rl.FLAG_MSAA_4X_HINT);
-    // rl.InitWindow(c.window_w, c.window_h, "raylib [core] example - basic window");
-    // rl.SetTargetFPS(60);
-    // defer rl.CloseWindow();
-    //
-    // rl.InitAudioDevice();
-    // defer rl.CloseAudioDevice();
-    // const music = rl.LoadMusicStream("assets/Woodland-Fantasy.wav");
-    // defer rl.UnloadMusicStream(music);
-    // var timePlayed: f32 = undefined;
-    // rl.PlayMusicStream(music);
-    //
-    // const level_args = try generate_levels(alloc);
-    // defer for (level_args) |lvl| lvl.level.deinit();
-    //
-    // var curr_i: usize = 0;
-    // var world = try get_world(alloc, level_args[curr_i]);
-    // defer world.deinit();
-    //
-    // while (!rl.WindowShouldClose()) {
-    //     rl.UpdateMusicStream(music);
-    //     timePlayed = rl.GetMusicTimePlayed(music) / rl.GetMusicTimeLength(music);
-    //     if (timePlayed > 1.0) timePlayed = 1.0;
-    //
-    //     try world.update();
-    //     world.render();
-    //
-    //     if (world.finished) {
-    //         if (world.player.alive) curr_i += 1;
-    //
-    //         if (curr_i == level_args.len) break;
-    //
-    //         world.deinit();
-    //         world = try get_world(alloc, level_args[curr_i]);
-    //     }
-    // }
+    const alloc = std.heap.c_allocator;
+    rl.SetConfigFlags(rl.FLAG_MSAA_4X_HINT);
+    rl.InitWindow(c.window_w, c.window_h, "raylib [core] example - basic window");
+    rl.SetTargetFPS(60);
+    defer rl.CloseWindow();
+
+    rl.InitAudioDevice();
+    defer rl.CloseAudioDevice();
+    const music = rl.LoadMusicStream("assets/Woodland-Fantasy.wav");
+    defer rl.UnloadMusicStream(music);
+    var timePlayed: f32 = undefined;
+    rl.PlayMusicStream(music);
+
+    const audio_mgr = AudioMgr.init();
+    defer audio_mgr.deinit();
+
+    var menu = Menu.init();
+    defer menu.deinit();
+
+    const level_args = try generate_levels(alloc);
+    defer for (level_args) |lvl| lvl.level.deinit();
+    var curr_i: usize = 0;
+    var world = try get_world(alloc, level_args[curr_i]);
+    defer world.deinit();
+
+    while (!rl.WindowShouldClose()) {
+        rl.UpdateMusicStream(music);
+        timePlayed = rl.GetMusicTimePlayed(music) / rl.GetMusicTimeLength(music);
+        if (timePlayed > 1.0) timePlayed = 1.0;
+
+        if (menu.sound_enabled) {
+            rl.ResumeMusicStream(music);
+        } else {
+            rl.PauseMusicStream(music);
+        }
+
+        if (!menu.finished) {
+            menu.process();
+        } else {
+            try world.update();
+            world.render();
+
+            if (world.finished) {
+                if (world.player.alive) curr_i += 1;
+
+                if (curr_i == level_args.len) break;
+
+                world.deinit();
+                world = try get_world(alloc, level_args[curr_i]);
+            }
+        }
+    }
 }
 
 fn get_world(alloc: std.mem.Allocator, args: LevelArgs) !World {
