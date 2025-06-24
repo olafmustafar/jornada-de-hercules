@@ -7,6 +7,10 @@ difficulty_classes: usize,
 gpa: std.mem.Allocator,
 random: std.Random.DefaultPrng,
 
+rate_bullets_avoided: f32,
+hits_taken: i32,
+
+
 pub fn init(gpa: std.mem.Allocator) Self {
     return .{
         .random = .init(1),

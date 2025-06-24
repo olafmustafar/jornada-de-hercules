@@ -130,26 +130,28 @@ const boss_room = Prefab{
 
 const enemy_sets = [_][]const Enemy.Type{
     &.{ .flyer, .flyer },
-    &.{ .fast_chaser, .fast_chaser },
-    &.{ .flyer, .slow_chaser, .flyer },
-    &.{ .walking_shooter, .walking_shooter },
+
+    &.{ .slow_chaser, .slow_chaser },
+    &.{ .shooter, .flyer, .flyer },
+    &.{ .shooter, .shooter },
+
     &.{ .shooter, .shooter, .shooter },
-    &.{ .fast_chaser, .slow_chaser },
-    &.{ .fast_chaser, .slow_chaser },
-    &.{ .walking_shooter, .flyer, .flyer },
+    &.{ .flyer, .slow_chaser, .flyer },
 };
 
 fn generate(ctx: *Context, instruction: Instruction) Rooms {
     switch (instruction) {
         .generate => |_| {
-            return generate_rooms(ctx.random.random(), ctx.gpa) catch {
+            return generate_rooms(ctx) catch {
                 unreachable;
             };
         },
     }
 }
 
-fn generate_rooms(rnd: std.Random, alloc: std.mem.Allocator) !Rooms {
+fn generate_rooms(ctx: *Context) !Rooms {
+    const alloc = ctx.gpa;
+    const rnd = ctx.random.random();
     var rooms = Rooms{
         .normal_rooms = .init(alloc),
         .boss_room = undefined,
@@ -162,7 +164,7 @@ fn generate_rooms(rnd: std.Random, alloc: std.mem.Allocator) !Rooms {
             .type = .normal_room,
             .tilemap = create_tilemap_from_string(room_str),
         };
-        const enemies = get_random_enemy_set(rnd, placeholders.len);
+        const enemies = get_random_enemy_set(ctx, rnd, placeholders.len);
         for (placeholders, enemies) |p, e| {
             try room.enemies.append(.{
                 .pos = .{ .x = @intCast(p[0]), .y = @intCast(p[1]) },
@@ -202,11 +204,26 @@ fn create_tilemap_from_string(str: []const u8) [8][12]Tile {
     return tilemap;
 }
 
-fn get_random_enemy_set(rnd: std.Random, size: usize) []const Enemy.Type {
+fn get_random_enemy_set(ctx: *Context, rnd: std.Random, size: usize) [4]?Enemy.Type {
     var enemy_set = enemy_sets[rnd.uintAtMost(usize, enemy_sets.len - 1)];
     while (enemy_set.len != size)
         enemy_set = enemy_sets[rnd.uintAtMost(usize, enemy_sets.len - 1)];
-    return enemy_set;
+
+    var result = ?Enemy.Type{null} ** 4;
+    for (enemy_set, 0..) |enemy, i| {
+        result[i] = enemy;
+        if (enemy == .shooter) {
+            if (ctx.rate_bullets_avoided >= 0.8) {
+                result[i] = if (rnd.float(f32) < 0.3) .predict_shooter else .walking_shooter;
+            } else if (ctx.rate_bullets_avoided >= 0.2) {
+                result[i] = if (rnd.float(f32) < 0.3) .walking_shooter else .shooter;
+            }
+        } else if (enemy == .slow_chaser and ctx.hits_taken < 10) {
+            result[i] = if (rnd.float(f32) < 0.3) .cornering_chaser else .fast_chaser;
+        }
+    }
+
+    return result;
 }
 
 pub const RoomGenerator = Generator(Instruction, Rooms, generate);

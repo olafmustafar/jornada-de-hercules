@@ -80,7 +80,9 @@ fn get_random_enemies(ctx: *Context, classes: usize) !EnemiesPerDifficulty {
         const last = &enemies.items[enemies.items.len - 1];
         last.set(.fast_chaser, fast_chaser);
         last.set(.slow_chaser, slow_chaser);
+        last.set(.cornering_chaser, slow_chaser);
         last.set(.shooter, shooter);
+        last.set(.predict_shooter, shooter);
         last.set(.walking_shooter, walking_shooter);
         last.set(.flyer, flyer);
         last.set(.boss, boss);

@@ -163,8 +163,10 @@ pub const Enemy = struct {
     pub const Type = enum {
         slow_chaser,
         fast_chaser,
+        cornering_chaser,
         shooter,
         walking_shooter,
+        predict_shooter,
         flyer,
         boss,
     };
