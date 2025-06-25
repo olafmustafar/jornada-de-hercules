@@ -51,7 +51,7 @@ const prefabs = [_]Prefab{
         \\.T~..T~..T~.
         \\............ 
         ,
-        &.{ .{ 4, 3 }, .{ 5, 5 }, .{ 7, 6 } },
+        &.{ .{ 4, 3 }, .{ 5, 5 }, .{ 7, 5 } },
     },
     .{ // 012345678901
         \\............
@@ -60,18 +60,18 @@ const prefabs = [_]Prefab{
         \\.....##.....
         \\.....##.....
         \\.##......##.
-        \\.####.#####.
+        \\.####..####.
         \\............ 
         ,
         &.{ .{ 3, 5 }, .{ 8, 2 } },
     },
     .{
         \\////////////
-        \\~~~~~~~~////
-        \\////////////
         \\////~~~~~~~~
+        \\/////~~~////
         \\////////////
         \\////////////
+        \\////~~~/////
         \\~~~~~~~~////
         \\//////////// 
         ,
@@ -165,10 +165,10 @@ fn generate_rooms(ctx: *Context) !Rooms {
             .tilemap = create_tilemap_from_string(room_str),
         };
         const enemies = get_random_enemy_set(ctx, rnd, placeholders.len);
-        for (placeholders, enemies) |p, e| {
+        for (placeholders, 0..) |p, i| {
             try room.enemies.append(.{
                 .pos = .{ .x = @intCast(p[0]), .y = @intCast(p[1]) },
-                .type = e,
+                .type = enemies[i].?,
             });
         }
         try rooms.normal_rooms.append(room);
@@ -209,7 +209,7 @@ fn get_random_enemy_set(ctx: *Context, rnd: std.Random, size: usize) [4]?Enemy.T
     while (enemy_set.len != size)
         enemy_set = enemy_sets[rnd.uintAtMost(usize, enemy_sets.len - 1)];
 
-    var result = ?Enemy.Type{null} ** 4;
+    var result = [_]?Enemy.Type{null} ** 4;
     for (enemy_set, 0..) |enemy, i| {
         result[i] = enemy;
         if (enemy == .shooter) {
@@ -218,7 +218,7 @@ fn get_random_enemy_set(ctx: *Context, rnd: std.Random, size: usize) [4]?Enemy.T
             } else if (ctx.rate_bullets_avoided >= 0.2) {
                 result[i] = if (rnd.float(f32) < 0.3) .walking_shooter else .shooter;
             }
-        } else if (enemy == .slow_chaser and ctx.hits_taken < 10) {
+        } else if (enemy == .slow_chaser and ctx.enemy_avoid_rate >= 0.8) {
             result[i] = if (rnd.float(f32) < 0.3) .cornering_chaser else .fast_chaser;
         }
     }

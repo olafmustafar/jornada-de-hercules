@@ -43,6 +43,8 @@ pub fn init(allocator: std.mem.Allocator) !Self {
 
 pub fn deinit(self: *Self) void {
     self.room_generator.deinit();
+    self.enemies_generator.deinit();
+    self.architecture_generator.deinit();
     self.gpa.destroy(self.context);
 }
 

@@ -22,6 +22,14 @@ const glsl_version: i32 = if (builtin.target.cpu.arch.isWasm()) 100 else 330;
 var g_world: ?*Self = undefined;
 
 const Self = @This();
+
+pub const Stats = struct {
+    bullets_shot: i32 = 0,
+    bullets_hit: i32 = 0,
+    enemies_activated: i32 = 0,
+    enemies_hit_player: i32 = 0,
+};
+
 pub const BossType = enum {
     lion,
     hydra,
@@ -29,7 +37,7 @@ pub const BossType = enum {
 };
 
 const Bullet = struct {
-    to_remove: bool,
+    alive: bool,
     pos: rl.Vector2,
     vector: rl.Vector2,
     dmg: i32,
@@ -50,6 +58,9 @@ const EnemyInstance = struct {
     shooting_cooldown: f32,
     flyer_move_target: ?rl.Vector2,
 
+    activated: bool,
+    player_hit: bool,
+
     pub fn init(self: *Self, pos: rl.Vector2, enemy: Enemy) EnemyInstance {
         var ei = EnemyInstance{
             .alive = true,
@@ -65,6 +76,8 @@ const EnemyInstance = struct {
             .inertia = rl.Vector2Zero(),
             .shooting_cooldown = 0,
             .flyer_move_target = null,
+            .activated = false,
+            .player_hit = false,
         };
 
         if (self.enemy_animations.get(enemy.type)) |anim| {
@@ -78,8 +91,7 @@ const EnemyInstance = struct {
                     ei.enemy.velocity *= 0.5;
                     ei.enemy.health = 40;
                 },
-                .stag => {
-                },
+                .stag => {},
             }
         }
 
@@ -124,6 +136,8 @@ player: Player,
 curr_room: ?rl.Rectangle,
 exits: std.ArrayList(Exit),
 
+stats: Stats,
+
 npcs: std.ArrayList(Npc),
 
 boss_type: BossType,
@@ -167,6 +181,7 @@ pub fn init(
     self.bullet_model = rl.LoadModel("assets/bullet.glb");
     self.npcs = .init(allocator);
     self.dialog = null;
+    self.stats = Stats{};
     try self.models.append(self.bullet_model);
     self.finished = false;
 
@@ -222,7 +237,9 @@ pub fn init(
     self.enemy_models = .init(.{
         .slow_chaser = rl.LoadModel("assets/spider.glb"),
         .fast_chaser = rl.LoadModel("assets/spider.glb"),
+        .cornering_chaser = rl.LoadModel("assets/spider.glb"),
         .shooter = rl.LoadModel("assets/snake.glb"),
+        .predict_shooter = rl.LoadModel("assets/snake.glb"),
         .walking_shooter = rl.LoadModel("assets/snake.glb"),
         .flyer = rl.LoadModel("assets/wasp.glb"),
         .boss = switch (boss_type) {
@@ -245,8 +262,10 @@ pub fn init(
     self.enemy_animations = .initUndefined();
     try load_animation(&self, .slow_chaser, "assets/spider.glb", 0, 2, 4);
     try load_animation(&self, .fast_chaser, "assets/spider.glb", 0, 2, 4);
+    try load_animation(&self, .cornering_chaser, "assets/spider.glb", 0, 2, 4);
     try load_animation(&self, .shooter, "assets/snake.glb", 0, 2, 4);
     try load_animation(&self, .walking_shooter, "assets/snake.glb", 0, 2, 4);
+    try load_animation(&self, .predict_shooter, "assets/snake.glb", 0, 2, 4);
     try load_animation(&self, .flyer, "assets/wasp.glb", 0, 2, 2);
     switch (boss_type) {
         .lion => try load_animation(&self, .boss, "assets/lion.glb", 3, 3, 3),
@@ -394,11 +413,17 @@ pub fn update(self: *Self) !void {
             if (!e.alive or !rl.CheckCollisionPointRec(e.pos, curr_room))
                 continue;
 
+            if (!e.activated) {
+                self.stats.enemies_activated += 1;
+                e.activated = true;
+            }
+
             if (e.enemy.type == .shooter or e.enemy.type == .walking_shooter) {
                 if (e.shooting_cooldown <= 0) {
                     e.shooting_cooldown = 2.3 - (e.enemy.shooting_velocity * 2);
+                    self.stats.bullets_shot += 1;
                     try self.bullets.append(.{
-                        .to_remove = false,
+                        .alive = true,
                         .dmg = @intFromFloat(e.enemy.damage * 50),
                         .pos = e.pos,
                         .vector = rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(self.player.position, e.pos)), 0.1),
@@ -410,22 +435,23 @@ pub fn update(self: *Self) !void {
                 if (e.shooting_cooldown <= 0) {
                     e.shooting_cooldown = 2.3 - (e.enemy.shooting_velocity * 2);
 
+                    self.stats.bullets_shot += 1;
                     const target_rad = c.look_target_rad(e.pos, self.player.position);
 
                     try self.bullets.append(.{
-                        .to_remove = false,
+                        .alive = true,
                         .dmg = @intFromFloat(e.enemy.damage * 50),
                         .pos = e.pos,
                         .vector = rl.Vector2Scale(rl.Vector2Rotate(vec2(0, 1), target_rad - (30 * rl.DEG2RAD)), 0.1),
                     });
                     try self.bullets.append(.{
-                        .to_remove = false,
+                        .alive = true,
                         .dmg = @intFromFloat(e.enemy.damage * 50),
                         .pos = e.pos,
                         .vector = rl.Vector2Scale(rl.Vector2Rotate(vec2(0, 1), target_rad), 0.1),
                     });
                     try self.bullets.append(.{
-                        .to_remove = false,
+                        .alive = true,
                         .dmg = @intFromFloat(e.enemy.damage * 50),
                         .pos = e.pos,
                         .vector = rl.Vector2Scale(rl.Vector2Rotate(vec2(0, 1), target_rad + (30 * rl.DEG2RAD)), 0.1),
@@ -440,6 +466,10 @@ pub fn update(self: *Self) !void {
                 e.pos = self.solve_collisions(e.pos, e.radius);
                 e.inertia = rl.Vector2Scale(e.inertia, 0.5);
             } else if (rl.CheckCollisionCircles(self.player.position, self.player.radius, e.pos, e.radius)) {
+                if (!e.player_hit) {
+                    e.player_hit = true;
+                    self.stats.enemies_hit_player += 1;
+                }
                 self.player.take_hit(@intFromFloat(e.enemy.damage * 50));
             } else if (e.enemy.type == .flyer or (e.enemy.type == .boss and self.boss_type == .stag)) {
                 const previous = e.pos;
@@ -478,23 +508,16 @@ pub fn update(self: *Self) !void {
     }
 
     for (self.bullets.items) |*e| {
+        if (!e.alive) continue;
         e.pos = rl.Vector2Add(e.pos, e.vector);
         if (self.curr_room != null and !rl.CheckCollisionPointRec(e.pos, self.curr_room.?)) {
-            e.to_remove = true;
+            e.alive = false;
         } else if (rl.CheckCollisionCircles(self.player.position, self.player.radius, e.pos, 0.2)) {
             self.player.take_hit(e.dmg);
-            e.to_remove = true;
+            self.stats.bullets_hit += 1;
+            e.alive = false;
         }
     }
-
-    var new_bullets: @TypeOf(self.bullets) = .init(self.bullets.allocator);
-    for (self.bullets.items) |e| {
-        if (!e.to_remove) {
-            try new_bullets.append(e);
-        }
-    }
-    self.bullets.deinit();
-    self.bullets = new_bullets;
 
     for (self.npcs.items) |*npc| npc.update();
 
@@ -548,6 +571,7 @@ pub fn render(self: Self) void {
         }
 
         for (self.bullets.items) |e| {
+            if (!e.alive) continue;
             const angle = rl.Vector2Angle(vec2(0, 1), rl.Vector2Normalize(e.vector)) * -rl.RAD2DEG;
             rl.DrawModelEx(self.bullet_model, to_world_pos(e.pos), vec3(0, 1, 0), angle, rl.Vector3Scale(rl.Vector3One(), 0.3), rl.WHITE);
         }
