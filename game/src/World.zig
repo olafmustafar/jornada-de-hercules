@@ -16,6 +16,7 @@ const rl = @import("raylib.zig");
 const rll = @import("rlights.zig");
 const Spotlight = @import("Spotlight.zig");
 const Dialog = @import("Dialog.zig");
+const EnemyInstance = @import("EnemyInstance.zig");
 
 const glsl_version: i32 = if (builtin.target.cpu.arch.isWasm()) 100 else 330;
 
@@ -41,62 +42,6 @@ const Bullet = struct {
     pos: rl.Vector2,
     vector: rl.Vector2,
     dmg: i32,
-};
-
-const EnemyInstance = struct {
-    alive: bool,
-    model: rl.Model,
-    animation: ?rl.ModelAnimation,
-    angle: f32,
-    enemy: Enemy,
-    active: bool,
-    pos: rl.Vector2,
-    health_points: f32,
-    radius: f32,
-    animation_frame: i32,
-    inertia: rl.Vector2,
-    shooting_cooldown: f32,
-    flyer_move_target: ?rl.Vector2,
-
-    activated: bool,
-    player_hit: bool,
-
-    pub fn init(self: *Self, pos: rl.Vector2, enemy: Enemy) EnemyInstance {
-        var ei = EnemyInstance{
-            .alive = true,
-            .model = self.enemy_models.get(enemy.type).?,
-            .animation = null,
-            .angle = 0.0,
-            .enemy = enemy,
-            .active = true,
-            .health_points = 100 * enemy.health,
-            .pos = pos,
-            .radius = 0.3,
-            .animation_frame = 0,
-            .inertia = rl.Vector2Zero(),
-            .shooting_cooldown = 0,
-            .flyer_move_target = null,
-            .activated = false,
-            .player_hit = false,
-        };
-
-        if (self.enemy_animations.get(enemy.type)) |anim| {
-            ei.animation = anim.run;
-        }
-        if (enemy.type == .boss and self.boss_type == .hydra) {
-            switch (self.boss_type) {
-                .lion => {},
-                .hydra => {
-                    ei.radius = 0.5;
-                    ei.enemy.velocity *= 0.5;
-                    ei.enemy.health = 40;
-                },
-                .stag => {},
-            }
-        }
-
-        return ei;
-    }
 };
 
 pub const Animations = struct {
@@ -338,12 +283,6 @@ pub fn deinit(self: Self) void {
 pub fn update(self: *Self) !void {
     set(self);
 
-    if (rl.IsKeyPressed(rl.KEY_K)) {
-        self.finished = true;
-        self.player.alive = false;
-        return;
-    }
-
     self.curr_room = null;
     for (self.level.room_rects.items) |room_rec| {
         const rlrec = rl.Rectangle{ .x = room_rec.x - 0.5, .y = room_rec.y - 0.5, .width = room_rec.w, .height = room_rec.h };
@@ -403,107 +342,12 @@ pub fn update(self: *Self) !void {
         return;
     }
 
-    const delta = rl.GetFrameTime();
-
     self.player.update();
     self.player.position = self.solve_collisions(self.player.position, self.player.radius);
 
     if (self.curr_room) |curr_room| {
         for (self.enemies.items) |*e| {
-            if (!e.alive or !rl.CheckCollisionPointRec(e.pos, curr_room))
-                continue;
-
-            if (!e.activated) {
-                self.stats.enemies_activated += 1;
-                e.activated = true;
-            }
-
-            if (e.enemy.type == .shooter or e.enemy.type == .walking_shooter) {
-                if (e.shooting_cooldown <= 0) {
-                    e.shooting_cooldown = 2.3 - (e.enemy.shooting_velocity * 2);
-                    self.stats.bullets_shot += 1;
-                    try self.bullets.append(.{
-                        .alive = true,
-                        .dmg = @intFromFloat(e.enemy.damage * 50),
-                        .pos = e.pos,
-                        .vector = rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(self.player.position, e.pos)), 0.1),
-                    });
-                } else {
-                    e.shooting_cooldown -= delta;
-                }
-            } else if (e.enemy.type == .boss and self.boss_type == .hydra) {
-                if (e.shooting_cooldown <= 0) {
-                    e.shooting_cooldown = 2.3 - (e.enemy.shooting_velocity * 2);
-
-                    self.stats.bullets_shot += 1;
-                    const target_rad = c.look_target_rad(e.pos, self.player.position);
-
-                    try self.bullets.append(.{
-                        .alive = true,
-                        .dmg = @intFromFloat(e.enemy.damage * 50),
-                        .pos = e.pos,
-                        .vector = rl.Vector2Scale(rl.Vector2Rotate(vec2(0, 1), target_rad - (30 * rl.DEG2RAD)), 0.1),
-                    });
-                    try self.bullets.append(.{
-                        .alive = true,
-                        .dmg = @intFromFloat(e.enemy.damage * 50),
-                        .pos = e.pos,
-                        .vector = rl.Vector2Scale(rl.Vector2Rotate(vec2(0, 1), target_rad), 0.1),
-                    });
-                    try self.bullets.append(.{
-                        .alive = true,
-                        .dmg = @intFromFloat(e.enemy.damage * 50),
-                        .pos = e.pos,
-                        .vector = rl.Vector2Scale(rl.Vector2Rotate(vec2(0, 1), target_rad + (30 * rl.DEG2RAD)), 0.1),
-                    });
-                } else {
-                    e.shooting_cooldown -= delta;
-                }
-            }
-
-            if (rl.Vector2Equals(e.inertia, rl.Vector2Zero()) == 0) {
-                e.pos = rl.Vector2Add(e.pos, e.inertia);
-                e.pos = self.solve_collisions(e.pos, e.radius);
-                e.inertia = rl.Vector2Scale(e.inertia, 0.5);
-            } else if (rl.CheckCollisionCircles(self.player.position, self.player.radius, e.pos, e.radius)) {
-                if (!e.player_hit) {
-                    e.player_hit = true;
-                    self.stats.enemies_hit_player += 1;
-                }
-                self.player.take_hit(@intFromFloat(e.enemy.damage * 50));
-            } else if (e.enemy.type == .flyer or (e.enemy.type == .boss and self.boss_type == .stag)) {
-                const previous = e.pos;
-                if (e.flyer_move_target == null or rl.Vector2Equals(e.flyer_move_target.?, e.pos) == 1) {
-                    var new_target = e.pos;
-                    const angle = @as(f32, @floatFromInt(rl.GetRandomValue(0, 360))) * rl.DEG2RAD;
-                    new_target = self.solve_collisions_flyer(rl.Vector2MoveTowards(new_target, rl.Vector2Add(new_target, rl.Vector2Rotate(vec2(0, 1), angle)), 0.5), e.radius);
-                    new_target = self.solve_collisions_flyer(rl.Vector2MoveTowards(new_target, self.player.position, 0.5), e.radius);
-                    e.flyer_move_target = self.solve_collisions_flyer(new_target, e.radius);
-                }
-
-                //in case it gets stuck
-                e.flyer_move_target = rl.Vector2MoveTowards(e.flyer_move_target.?, e.pos, 0.1 * delta);
-                e.pos = rl.Vector2MoveTowards(e.pos, e.flyer_move_target.?, 5 * e.enemy.velocity * delta);
-                e.pos = self.solve_collisions_flyer(e.pos, e.radius);
-                e.angle = rl.Vector2Angle(vec2(0, 1), rl.Vector2Normalize(rl.Vector2Subtract(e.pos, previous))) * -rl.RAD2DEG;
-            } else if (e.enemy.type == .boss and self.boss_type == .hydra) {
-                const previous = e.pos;
-                const room = self.curr_room.?;
-                e.pos = rl.Vector2MoveTowards(e.pos, vec2(room.x + (room.width / 2) - 0.5, room.y + (room.height / 2)), 5 * e.enemy.velocity * delta);
-                e.pos = self.solve_collisions(e.pos, e.radius);
-                e.angle = rl.Vector2Angle(vec2(0, 1), rl.Vector2Normalize(rl.Vector2Subtract(e.pos, previous))) * -rl.RAD2DEG;
-            } else {
-                const previous = e.pos;
-                e.pos = rl.Vector2MoveTowards(e.pos, self.player.position, 5 * e.enemy.velocity * delta);
-                e.pos = self.solve_collisions(e.pos, e.radius);
-                e.angle = rl.Vector2Angle(vec2(0, 1), rl.Vector2Normalize(rl.Vector2Subtract(e.pos, previous))) * -rl.RAD2DEG;
-            }
-
-            if (e.animation) |animation| {
-                e.animation_frame += 1;
-                rl.UpdateModelAnimation(e.model, animation, e.animation_frame);
-                if (e.animation_frame >= animation.frameCount) e.animation_frame = 0;
-            }
+            try e.update(curr_room);
         }
     }
 
@@ -559,15 +403,7 @@ pub fn render(self: Self) void {
         }
 
         for (self.enemies.items) |e| {
-            if (!e.alive) continue;
-            if (e.enemy.type == .boss and self.boss_type == .hydra) {
-                rl.DrawModelEx(self.hydra_body.?, to_world_pos(e.pos), vec3(0, 1, 0), e.angle, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
-                rl.DrawModelEx(e.model, to_world_pos(rl.Vector2Add((e.pos), vec2(-0.3, 0))), vec3(0, 1, 0), e.angle - 30, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
-                rl.DrawModelEx(e.model, to_world_pos(e.pos), vec3(0, 1, 0), e.angle, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
-                rl.DrawModelEx(e.model, to_world_pos(rl.Vector2Add((e.pos), vec2(0.3, 0))), vec3(0, 1, 0), e.angle + 30, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
-            } else {
-                rl.DrawModelEx(e.model, to_world_pos(e.pos), vec3(0, 1, 0), e.angle, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
-            }
+            e.render();
         }
 
         for (self.bullets.items) |e| {
@@ -607,7 +443,7 @@ fn set(world: *Self) void {
     g_world = world;
 }
 
-fn to_world_pos_y(pos: rl.Vector2, y: f32) rl.Vector3 {
+pub fn to_world_pos_y(pos: rl.Vector2, y: f32) rl.Vector3 {
     return vec3(pos.x * 0.90, y, pos.y * 0.90);
 }
 
@@ -615,11 +451,11 @@ pub fn to_world_pos(pos: rl.Vector2) rl.Vector3 {
     return vec3(pos.x * 0.90, 0, pos.y * 0.90);
 }
 
-fn solve_collisions_flyer(self: *Self, circ: rl.Vector2, radius: f32) rl.Vector2 {
+pub fn solve_collisions_flyer(self: *Self, circ: rl.Vector2, radius: f32) rl.Vector2 {
     return self.solve_collisions_impl(circ, radius, true);
 }
 
-fn solve_collisions(self: *Self, circ: rl.Vector2, radius: f32) rl.Vector2 {
+pub fn solve_collisions(self: *Self, circ: rl.Vector2, radius: f32) rl.Vector2 {
     return self.solve_collisions_impl(circ, radius, false);
 }
 
