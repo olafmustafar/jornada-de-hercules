@@ -130,11 +130,13 @@ const boss_room = Prefab{
 
 const enemy_sets = [_][]const Enemy.Type{
     &.{ .flyer, .flyer },
-
     &.{ .slow_chaser, .slow_chaser },
-    &.{ .shooter, .flyer, .flyer },
     &.{ .shooter, .shooter },
+    &.{ .slow_chaser, .shooter },
+    &.{ .flyer, .shooter },
 
+    &.{ .shooter, .flyer, .flyer },
+    &.{ .slow_chaser, .shooter, .slow_chaser },
     &.{ .shooter, .shooter, .shooter },
     &.{ .flyer, .slow_chaser, .flyer },
 };
@@ -212,14 +214,34 @@ fn get_random_enemy_set(ctx: *Context, rnd: std.Random, size: usize) [4]?Enemy.T
     var result = [_]?Enemy.Type{null} ** 4;
     for (enemy_set, 0..) |enemy, i| {
         result[i] = enemy;
+        const chance = rnd.float(f32);
+
         if (enemy == .shooter) {
-            if (ctx.rate_bullets_avoided >= 0.8) {
-                result[i] = if (rnd.float(f32) < 0.3) .predict_shooter else .walking_shooter;
-            } else if (ctx.rate_bullets_avoided >= 0.2) {
-                result[i] = if (rnd.float(f32) < 0.3) .walking_shooter else .shooter;
+            if (ctx.rate_bullets_hit <= 0.8) {
+                result[i] = if (chance < 0.5) .shooter else .walking_shooter;
+            } else if (ctx.rate_bullets_hit <= 5) {
+                result[i] = if (chance < 0.33)
+                    .predict_shooter
+                else if (chance < 0.66)
+                    .walking_shooter
+                else
+                    .shooter;
+            } else if (ctx.rate_bullets_hit <= 0.3) {
+                result[i] = if (chance < 0.5) .predict_shooter else .walking_shooter;
             }
-        } else if (enemy == .slow_chaser and ctx.enemy_avoid_rate >= 0.8) {
-            result[i] = if (rnd.float(f32) < 0.3) .cornering_chaser else .fast_chaser;
+        } else if (enemy == .slow_chaser) {
+            if (ctx.enemy_hit_rate <= 0.8) {
+                result[i] = if (chance < 0.5) .cornering_chaser else .slow_chaser;
+            } else if (ctx.enemy_hit_rate <= 0.5) {
+                result[i] = if (chance < 0.33)
+                    .cornering_chaser
+                else if (chance < 0.66)
+                    .fast_chaser
+                else
+                    .slow_chaser;
+            } else if (ctx.enemy_hit_rate <= 0.3) {
+                result[i] = if (chance < 0.5) .cornering_chaser else .fast_chaser;
+            }
         }
     }
 

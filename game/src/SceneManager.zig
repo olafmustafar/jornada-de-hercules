@@ -4,6 +4,7 @@ const contents = @import("pcgmanager").Contents;
 const Level = contents.Level;
 const Tile = contents.Tile;
 const PCGManager = @import("pcgmanager");
+const c = @import("commons.zig");
 
 const rl = @import("raylib.zig");
 const World = @import("World.zig");
@@ -77,11 +78,14 @@ current: i32,
 gpa: std.mem.Allocator,
 
 pub fn init(alloc: std.mem.Allocator) !Self {
-    return .{
+    var self = Self{
         .pcg = try PCGManager.init(alloc),
         .current = 0,
         .gpa = alloc,
     };
+    self.pcg.context.enemy_hit_rate = 0.8;
+    self.pcg.context.rate_bullets_hit = 0.8;
+    return self;
 }
 
 pub fn deinit(self: *Self) void {
@@ -96,8 +100,10 @@ pub fn next(self: *Self) bool {
 }
 
 pub fn update_stats(self: *Self, stats: World.Stats) void {
-    self.pcg.context.rate_bullets_avoided = stats.bullets_hit / stats.bullets_shot;
-    self.pcg.context.enemy_avoid_rate =  stats.enemies_hit_player / stats.enemies_activated;
+    if (std.mem.containsAtLeastScalar(i32, &[_]i32{ 1, 3, 4 }, 1, self.current)) {
+        self.pcg.context.rate_bullets_hit = c.as_f32(stats.bullets_hit) / c.as_f32(stats.bullets_shot);
+        self.pcg.context.enemy_hit_rate = c.as_f32(stats.enemies_hit_player) / c.as_f32(stats.enemies_activated);
+    }
 }
 
 pub fn get_current(self: *Self) !LevelArgs {

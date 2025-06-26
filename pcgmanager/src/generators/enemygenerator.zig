@@ -31,9 +31,17 @@ fn get_random_enemies(ctx: *Context, classes: usize) !EnemiesPerDifficulty {
 
         const fast_chaser = Enemy{
             .type = .fast_chaser,
-            .damage = multiplier * 0.2,
+            .damage = multiplier * 0.5,
             .health = multiplier * 0.4,
             .velocity = multiplier,
+            .shooting_velocity = 0,
+        };
+
+        const cornering_chaser = Enemy{
+            .type = .cornering_chaser,
+            .damage = multiplier * 0.5,
+            .health = multiplier * 0.4,
+            .velocity = multiplier * 0.9,
             .shooting_velocity = 0,
         };
 
@@ -47,6 +55,14 @@ fn get_random_enemies(ctx: *Context, classes: usize) !EnemiesPerDifficulty {
 
         const shooter = Enemy{
             .type = .shooter,
+            .damage = multiplier * 0.8,
+            .health = multiplier * 0.2,
+            .velocity = 0,
+            .shooting_velocity = multiplier * 0.5,
+        };
+
+        const predict_shooter = Enemy{
+            .type = .predict_shooter,
             .damage = multiplier * 0.8,
             .health = multiplier * 0.2,
             .velocity = 0,
@@ -69,7 +85,7 @@ fn get_random_enemies(ctx: *Context, classes: usize) !EnemiesPerDifficulty {
             .shooting_velocity = 0,
         };
 
-        const boss = Enemy {
+        const boss = Enemy{
             .type = .boss,
             .damage = multiplier * 0.8,
             .health = multiplier * 1.8,
@@ -80,9 +96,9 @@ fn get_random_enemies(ctx: *Context, classes: usize) !EnemiesPerDifficulty {
         const last = &enemies.items[enemies.items.len - 1];
         last.set(.fast_chaser, fast_chaser);
         last.set(.slow_chaser, slow_chaser);
-        last.set(.cornering_chaser, slow_chaser);
+        last.set(.cornering_chaser, cornering_chaser);
         last.set(.shooter, shooter);
-        last.set(.predict_shooter, shooter);
+        last.set(.predict_shooter, predict_shooter);
         last.set(.walking_shooter, walking_shooter);
         last.set(.flyer, flyer);
         last.set(.boss, boss);

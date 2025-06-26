@@ -105,6 +105,7 @@ door_open: rl.Model,
 door_closed: rl.Model,
 
 dialog: ?Dialog,
+display_debug: bool = false,
 
 finished: bool,
 
@@ -282,6 +283,9 @@ pub fn deinit(self: Self) void {
 
 pub fn update(self: *Self) !void {
     set(self);
+    if (rl.IsKeyPressed(rl.KEY_PERIOD)) {
+        self.display_debug = !self.display_debug;
+    }
 
     self.curr_room = null;
     for (self.level.room_rects.items) |room_rec| {
@@ -425,7 +429,16 @@ pub fn render(self: Self) void {
     rl.DrawRectangle(25, 25, @as(i32, @intFromFloat(life * 100.0)), 20, rl.RED);
     rl.DrawText("HP", 25, 25, 20, rl.WHITE);
 
-    if (self.dialog) |dialog| dialog.render();
+    if (self.display_debug) {
+        rl.DrawRectangle(20, 50, 150, 100, rl.BLACK);
+        rl.DrawText(rl.TextFormat(
+            \\ bullets_shot: %i
+            \\ bullets_hit: %i
+            \\ enemies_activated: %i
+            \\ enemies_hit_player: %i
+        , self.stats.bullets_shot, self.stats.bullets_hit, self.stats.enemies_activated, self.stats.enemies_hit_player), 22, 52, 10, rl.WHITE);
+        if (self.dialog) |dialog| dialog.render();
+    }
 
     {
         rl.BeginShaderMode(self.spotlight);

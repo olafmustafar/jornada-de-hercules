@@ -184,24 +184,19 @@ pub fn update(self: *Self, curr_room: rl.Rectangle) !void {
 pub fn render(self: Self) void {
     if (!self.alive) return;
     const world = World.get();
-    if (self.enemy.type == .boss and world.boss_type == .hydra) {
-        rl.DrawModelEx(world.hydra_body.?, World.to_world_pos(self.pos), c.vec3(0, 1, 0), self.angle, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
-        rl.DrawModelEx(self.model, World.to_world_pos(rl.Vector2Add((self.pos), c.vec2(-0.3, 0))), c.vec3(0, 1, 0), self.angle - 30, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
-        rl.DrawModelEx(self.model, World.to_world_pos(self.pos), c.vec3(0, 1, 0), self.angle, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
-        rl.DrawModelEx(self.model, World.to_world_pos(rl.Vector2Add((self.pos), c.vec2(0.3, 0))), c.vec3(0, 1, 0), self.angle + 30, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
-    } else {
-        rl.DrawModelEx(self.model, World.to_world_pos(self.pos), c.vec3(0, 1, 0), self.angle, rl.Vector3Scale(rl.Vector3One(), 0.2), rl.WHITE);
-    }
+    const tint = switch (self.enemy.type) {
+        .cornering_chaser => rl.RED,
+        .predict_shooter => rl.YELLOW,
+        .fast_chaser => rl.GREEN,
+        else => rl.WHITE,
+    };
 
-    const step = 5 * self.enemy.velocity * rl.GetFrameTime();
-    const previous = self.pos;
-    var new = rl.Vector2MoveTowards(previous, world.player.position, step);
-    new = world.solve_collisions(new, self.radius);
-    var i: i32 = 0;
-    while (i <= 10 and rl.FloatEquals(rl.Vector2Distance(previous, new), step) == 0) {
-        i += 1;
-        const new_target = rl.Vector2Add(previous, rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(new, previous)), 1.2));
-        new = rl.Vector2MoveTowards(previous, new_target, step);
-        new = world.solve_collisions(new, self.radius);
+    if (self.enemy.type == .boss and world.boss_type == .hydra) {
+        rl.DrawModelEx(world.hydra_body.?, World.to_world_pos(self.pos), c.vec3(0, 1, 0), self.angle, rl.Vector3Scale(rl.Vector3One(), 0.2), tint);
+        rl.DrawModelEx(self.model, World.to_world_pos(rl.Vector2Add((self.pos), c.vec2(-0.3, 0))), c.vec3(0, 1, 0), self.angle - 30, rl.Vector3Scale(rl.Vector3One(), 0.2), tint);
+        rl.DrawModelEx(self.model, World.to_world_pos(self.pos), c.vec3(0, 1, 0), self.angle, rl.Vector3Scale(rl.Vector3One(), 0.2), tint);
+        rl.DrawModelEx(self.model, World.to_world_pos(rl.Vector2Add((self.pos), c.vec2(0.3, 0))), c.vec3(0, 1, 0), self.angle + 30, rl.Vector3Scale(rl.Vector3One(), 0.2), tint);
+    } else {
+        rl.DrawModelEx(self.model, World.to_world_pos(self.pos), c.vec3(0, 1, 0), self.angle, rl.Vector3Scale(rl.Vector3One(), 0.2), tint);
     }
 }
