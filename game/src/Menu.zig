@@ -194,13 +194,6 @@ pub fn process(self: *Self) void {
             rl.DrawRectangle(0, 0, c.window_w, c.window_h, rl.Color{ .r = 0x00, .g = 0x00, .b = 0x00, .a = alpha });
         },
     }
-
-    rl.DrawRectangleRec(rl.Rectangle{
-        .x = 100,
-        .y = 100,
-        .width = 400,
-        .height = 250,
-    }, rl.BLACK);
 }
 
 fn draw_button(text: [*c]const u8, rec: rl.Rectangle) void {
@@ -210,6 +203,8 @@ fn draw_button(text: [*c]const u8, rec: rl.Rectangle) void {
     if (rl.CheckCollisionPointRec(mouse_pos, rec)) {
         color = rl.ColorBrightness(color, 1.25);
     }
+
+    rl.DrawRectangleRec(rec, color);
     rl.DrawRectangleRec(rl.Rectangle{
         .width = rec.width - 10,
         .height = rec.height - 10,

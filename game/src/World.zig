@@ -107,6 +107,9 @@ door_closed: rl.Model,
 dialog: ?Dialog,
 display_debug: bool = false,
 
+arrows_controls_texture: rl.Texture2D,
+attack_controls_texture: rl.Texture2D,
+
 finished: bool,
 
 pub fn init(
@@ -130,6 +133,14 @@ pub fn init(
     self.stats = Stats{};
     try self.models.append(self.bullet_model);
     self.finished = false;
+
+    const arrow_ctrl_img = rl.LoadImage("assets/arrow_controls.png");
+    defer rl.UnloadImage(arrow_ctrl_img);
+    self.arrows_controls_texture = rl.LoadTextureFromImage(arrow_ctrl_img);
+
+    const attack_ctrl_img = rl.LoadImage("assets/attack_controls.png");
+    defer rl.UnloadImage(attack_ctrl_img);
+    self.attack_controls_texture = rl.LoadTextureFromImage(attack_ctrl_img);
 
     self.camera = rl.Camera3D{
         .position = vec3(10.0, 5.0, 10.0),
@@ -279,6 +290,8 @@ pub fn deinit(self: Self) void {
     self.exits.deinit();
     self.npcs.deinit();
     if (self.dialog) |*dialog| dialog.deinit();
+    rl.UnloadTexture(self.arrows_controls_texture);
+    rl.UnloadTexture(self.attack_controls_texture);
 }
 
 pub fn update(self: *Self) !void {
@@ -297,14 +310,13 @@ pub fn update(self: *Self) !void {
 
     var center = self.camera.target;
     if (self.curr_room) |room| {
-        center = to_world_pos(vec2(room.x + (room.width / 2) - 0.5, room.y + (room.height / 2)));
+        center = rl.Vector3Add(to_world_pos(vec2(room.x + (room.width / 2) - 0.5, room.y + (room.height / 2))), vec3(0, 0, -1));
     } else if (self.player.exiting_direction == null) {
         center = to_world_pos(self.player.position);
     }
 
     const dist = rl.Vector3Distance(self.camera.target, center);
     self.camera.target = rl.Vector3MoveTowards(self.camera.target, center, rl.logf(dist + 1.1) * 0.1);
-    // self.camera.position = rl.Vector3Add(self.camera.target, vec3(0, 8, 0.5));
     self.camera.position = rl.Vector3Add(self.camera.target, vec3(0, 9, 0.5));
     rl.UpdateCamera(&self.camera, rl.CAMERA_CUSTOM);
     rl.SetShaderValue(
@@ -423,11 +435,36 @@ pub fn render(self: Self) void {
         rl.DrawSphere(self.light.position, 0.15, rl.YELLOW);
     }
 
-    const life: f32 = @as(f32, @floatFromInt(self.player.health)) / @as(f32, @floatFromInt(Player.max_health));
+    rl.DrawRectangle(0, 0, c.window_w, 70, rl.Color{ .r = 0x00, .g = 0x00, .b = 0x00, .a = 0xaa });
+
+    const life: f32 = c.as_f32(self.player.health) / c.as_f32(Player.max_health);
+
     rl.DrawRectangle(20, 20, 110, 30, rl.BLACK);
     rl.DrawRectangle(25, 25, 100, 20, rl.GRAY);
     rl.DrawRectangle(25, 25, @as(i32, @intFromFloat(life * 100.0)), 20, rl.RED);
     rl.DrawText("HP", 25, 25, 20, rl.WHITE);
+    const y = 15;
+    var x: i32 = window_w - 20;
+    const txt_mover = "Mover :";
+    const txt_atacar = "Atacar :";
+    const scale = 0.4;
+
+    x -= @intFromFloat(c.as_f32(self.attack_controls_texture.width) * scale);
+    rl.DrawTextureEx(self.attack_controls_texture, vec2(c.as_f32(x), y), 0.0, scale, rl.WHITE);
+
+    x -= rl.MeasureText(txt_atacar, 20);
+    x -= 10;
+    rl.DrawText(txt_atacar, x, y + 5, 20, rl.WHITE);
+
+    x -= @intFromFloat(c.as_f32(self.arrows_controls_texture.width) * scale);
+    x -= 20;
+    rl.DrawTextureEx(self.arrows_controls_texture, vec2(c.as_f32(x), y), 0.0, scale, rl.WHITE);
+
+    x -= rl.MeasureText(txt_mover, 20);
+    x -= 10;
+    rl.DrawText(txt_mover, x, y + 5, 20, rl.WHITE);
+
+    if (self.dialog) |dialog| dialog.render();
 
     if (self.display_debug) {
         rl.DrawRectangle(20, 50, 150, 100, rl.BLACK);
@@ -437,7 +474,6 @@ pub fn render(self: Self) void {
             \\ enemies_activated: %i
             \\ enemies_hit_player: %i
         , self.stats.bullets_shot, self.stats.bullets_hit, self.stats.enemies_activated, self.stats.enemies_hit_player), 22, 52, 10, rl.WHITE);
-        if (self.dialog) |dialog| dialog.render();
     }
 
     {
