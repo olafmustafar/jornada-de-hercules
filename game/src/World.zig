@@ -288,7 +288,10 @@ pub fn deinit(self: Self) void {
     self.enemies.deinit();
     self.bullets.deinit();
     self.exits.deinit();
+
+    for(self.npcs.items) |npc| npc.deinit();
     self.npcs.deinit();
+
     if (self.dialog) |*dialog| dialog.deinit();
     rl.UnloadTexture(self.arrows_controls_texture);
     rl.UnloadTexture(self.attack_controls_texture);

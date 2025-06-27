@@ -60,27 +60,11 @@ pub fn main() !void {
                         break;
                     }
                 }
-                const bullets_hit = world.stats.bullets_hit;
-                const bullets_shot = world.stats.bullets_shot;
-                const enemies_hit_player = world.stats.enemies_hit_player;
-                const enemies_activated = world.stats.enemies_activated;
 
                 world.deinit();
                 world = try get_world(alloc, try scene_mgr.get_current());
-
-                std.debug.print("status updated \n", .{});
-                std.debug.print("    bullets_hit {d}\n", .{bullets_hit});
-                std.debug.print("    bullets_shot {d}\n", .{bullets_shot});
-                std.debug.print("    enemies_hit_player {d}\n", .{enemies_hit_player});
-                std.debug.print("    enemies_activated {d}\n", .{enemies_activated});
-                std.debug.print("    rate_bullets_hit {d}\n", .{scene_mgr.pcg.context.rate_bullets_hit});
-                std.debug.print("    enemY_hit_rate {d}\n", .{scene_mgr.pcg.context.enemy_hit_rate});
-
-                std.debug.print("enemies: \n", .{});
-                for (world.enemies.items) |e| {
-                    std.debug.print("    {s}\n", .{std.enums.tagName(contents.Enemy.Type, e.enemy.type).?});
-                }
             }
+
         }
     }
 }

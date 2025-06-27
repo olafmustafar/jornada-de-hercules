@@ -49,3 +49,16 @@ pub fn ease_out_elastic(x: f32) f32 {
         return std.math.pow(f32, 2, -10 * x) * std.math.sin((x * 10 - 0.75) * c4) + 1;
     }
 }
+
+pub fn matrix_look_at(source: rl.Vector3 , target: rl.Vector3 , up: rl.Vector3 ) rl.Matrix {
+    const forward = rl.Vector3Normalize(rl.Vector3Subtract(target, source));
+    const right = rl.Vector3Normalize(rl.Vector3CrossProduct(up, forward));
+    const realUp = rl.Vector3CrossProduct(forward, right);
+
+    return rl.Matrix{
+        .m0 = right.x,    .m1 = right.y,    .m2 = right.z,    .m3 = 0.0,
+        .m4 = realUp.x,   .m5 = realUp.y,   .m6 = realUp.z,   .m7 = 0.0,
+        .m8 = forward.x,  .m9 = forward.y,  .m10 = forward.z,  .m11 = 0.0,
+        .m12 = 0.0,       .m13 = 0.0,       .m14 = 0.0,       .m15 = 1.0,
+    };
+}
