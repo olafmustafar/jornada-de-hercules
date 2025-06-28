@@ -17,6 +17,7 @@ const rll = @import("rlights.zig");
 const Spotlight = @import("Spotlight.zig");
 const Dialog = @import("Dialog.zig");
 const EnemyInstance = @import("EnemyInstance.zig");
+const Particles = @import("Particles.zig");
 
 const glsl_version: i32 = if (builtin.target.cpu.arch.isWasm()) 100 else 330;
 
@@ -92,6 +93,7 @@ enemy_animations: std.EnumArray(Enemy.Type, ?EnemyAnimations),
 bullets: std.ArrayList(Bullet),
 bullet_model: rl.Model,
 hydra_body: ?rl.Model,
+particles: Particles,
 
 shader: rl.Shader,
 light: rll.Light,
@@ -271,8 +273,16 @@ pub fn init(
         }
     }
 
-    for (self.models.items) |model|
-        model.materials[1].shader = self.shader;
+
+    for (self.models.items) |model| {
+        for (0..@intCast(model.materialCount)) |i| {
+            model.materials[i].shader = self.shader;
+        }
+    }
+
+    const particles_model = rl.LoadModelFromMesh(rl.GenMeshSphere(0.3, 10, 10));
+    self.particles = .init(particles_model);
+    try self.models.append(particles_model);
 
     return self;
 }
@@ -289,7 +299,7 @@ pub fn deinit(self: Self) void {
     self.bullets.deinit();
     self.exits.deinit();
 
-    for(self.npcs.items) |npc| npc.deinit();
+    for (self.npcs.items) |npc| npc.deinit();
     self.npcs.deinit();
 
     if (self.dialog) |*dialog| dialog.deinit();
@@ -391,6 +401,8 @@ pub fn update(self: *Self) !void {
             self.dialog = null;
         }
     }
+
+    self.particles.update();
 }
 
 pub fn render(self: Self) void {
@@ -432,6 +444,8 @@ pub fn render(self: Self) void {
         }
 
         self.player.render();
+
+        self.particles.render();
 
         for (self.npcs.items) |npc| npc.render();
 

@@ -158,6 +158,7 @@ fn attack(self: *Self) void {
             e.health_points -= 10;
             if (e.health_points <= 0) {
                 rl.PlaySound(AudioMgr.get().enemy_die);
+                world.particles.start(World.to_world_pos(e.pos));
                 e.alive = false;
             } else {
                 rl.PlaySound(AudioMgr.get().hit);
