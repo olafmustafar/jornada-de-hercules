@@ -71,6 +71,32 @@ const spawn =
     \\TTTTTTTTTTTTTTTTTTTTTT
 ;
 
+const finish =
+    \\TTT...T.........TTTTTT
+    \\TTTTT............TTTTT
+    \\TTT.....T.........TTTT
+    \\TTTT............T.TTTT
+    \\TTTT.TT.......T.TTTTTT
+    \\TTT...............TTTT
+    \\TTTT................TT
+    \\TTT...TT.T....T.TT.TTT
+    \\TTTTTTTT.T..TTTTTTTTTT
+    \\TTTT######dd######TTTT
+    \\TTTT#............#TTTT
+    \\TTTT#............#TTTT
+    \\TTTT#............#TTTT
+    \\TTTT#............#TTTT
+    \\TTTT######dd######TTTT
+    \\TTTTTTTT#....#TTTTTTTT
+    \\TTTTTTTT#....#TTTTTTTT
+    \\TTTTTTTT######TTTTTTTT
+    \\TTTTTTTTTTTTTTTTTTTTTT
+    \\TTTTTTTTTTTTTTTTTTTTTT
+    \\TTTTTTTTTTTTTTTTTTTTTT
+    \\TTTTTTTTTTTTTTTTTTTTTT
+    \\TTTTTTTTTTTTTTTTTTTTTT
+    \\TTTTTTTTTTTTTTTTTTTTTT
+;
 const Self = @This();
 
 pcg: PCGManager,
@@ -93,7 +119,8 @@ pub fn deinit(self: *Self) void {
 }
 
 pub fn next(self: *Self) bool {
-    if (self.current == 5) return false;
+    if (self.current == 0) return false;
+    // if (self.current == 6) return false;
 
     self.current += 1;
     return true;
@@ -150,6 +177,7 @@ pub fn get_current(self: *Self) !LevelArgs {
             .tiles = normal_tiles,
             .boss = .stag,
         },
+        6 => finish_scene(self.gpa),
         else => unreachable,
     };
 }
@@ -165,7 +193,7 @@ fn initial_scene(alloc: std.mem.Allocator) !LevelArgs {
     return .{
         .level = blk: {
             var level = try Level.from_string(alloc, spawn);
-            try level.placeholders.append(.{ .position = .init(10, 14), .entity = .{ .player = {} } });
+            try level.placeholders.append(.{ .position = .init(10, 16), .entity = .{ .player = {} } });
             try level.placeholders.append(.{ .position = .init(8, 5), .entity = .{ .npc = .{
                 .name = "Rei Euristeu",
                 .dialog = &[_][]const u8{
@@ -235,8 +263,8 @@ fn second_scene(alloc: std.mem.Allocator) !LevelArgs {
             try level.room_rects.append(.{ .x = 4, .y = 10, .w = 14, .h = 8 });
             break :blk level;
         },
-        .boss = .hydra,
-        .tint = green,
+        .boss = .lion,
+        .tint = rl.WHITE,
         .tiles = swamp_tiles,
     };
 }
@@ -276,6 +304,46 @@ fn third_scene(alloc: std.mem.Allocator) !LevelArgs {
             try level.placeholders.append(.{ .position = .init(11, 4), .entity = .{ .exit = .up } });
             try level.room_rects.append(.{ .x = 4, .y = 4, .w = 14, .h = 6 });
             try level.room_rects.append(.{ .x = 4, .y = 10, .w = 14, .h = 8 });
+            break :blk level;
+        },
+        .tint = light_green,
+        .tiles = normal_tiles,
+        .boss = .stag,
+    };
+}
+
+fn finish_scene(alloc: std.mem.Allocator) !LevelArgs {
+    return .{
+        .level = blk: {
+            var level = try Level.from_string(alloc, finish);
+            try level.placeholders.append(.{ .position = .init(10, 16), .entity = .{ .player = {} } });
+            try level.placeholders.append(.{ .position = .init(10, 11), .entity = .{ .npc = .{
+                .name = "Rei Euristeu",
+                .dialog = &[_][]const u8{
+                    \\Ouça bem, herói!
+                    \\Não te iludas achando 
+                    \\ que a glória virá fácil.
+                    \\tua jornada não se encerra 
+                    \\ ainda.
+                    ,
+                    \\Ainda há varios trabalhos
+                    \\ esperando por você
+                    ,
+                    \\Esses foram apenas os primeiros 
+                    \\ passos de uma longa estrada
+                    \\ coberta de espinhos.
+                    \\Mal tocaste a superfície do 
+                    \\ que preparei para ti.
+                    ,
+                    \\Agora vá.
+                    \\Cumpre o próximo passo.
+                    \\O tempo ruge, e a tua dor...
+                    \\ me diverte...,
+                },
+            } } });
+            try level.room_rects.append(.{ .x = 4, .y = 9, .w = 14, .h = 6 });
+            try level.placeholders.append(.{ .position = .init(10, 9), .entity = .{ .exit = .up } });
+            try level.placeholders.append(.{ .position = .init(11, 9), .entity = .{ .exit = .up } });
             break :blk level;
         },
         .tint = light_green,

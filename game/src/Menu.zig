@@ -33,7 +33,59 @@ const intro_text =
     \\Não como guerreiro, mas como servo. E cumprir doze 
     \\ trabalhos impossíveis ...
 ;
-const State = enum { menu, intro_text, black_screen };
+const ending_text =
+    \\Outra vez, passos firmes sobre um chão que treme
+    \\ diante do seu nome.
+    \\Hércules — filho do trovão, moldado na dor, forjado
+    \\ na sombra dos deuses.
+    \\
+    \\Mas não é força o que o espera.
+    \\Não é glória.
+    \\O que o aguarda é o silêncio entre as batalhas,
+    \\O vazio entre os gritos,
+    \\A lenta corrosão que consome até os maiores.
+    \\
+    \\Porque não há repouso para os escolhidos.
+    \\Nem paz para os que carregam o fardo da lenda.
+    \\
+    \\E, no entanto, ele caminha.
+    \\Não por ambição.
+    \\Mas por um tipo de necessidade que nem os deuses
+    \\ compreendem
+    \\Uma busca por redenção, talvez...
+    \\Ou apenas por sentido.
+    \\
+    \\Cada passo o leva mais longe dos mortais
+    \\E mais perto de algo que nenhum mortal jamais tocou:
+    \\A eternidade... ou o esquecimento.
+    \\
+    \\Que os ventos o levem com respeito.
+    \\Que os céus se calem ao vê-lo passar.
+    \\Pois não há tarefa maior do que carregar o próprio 
+    \\ nome
+    \\Como se fosse um fardo.
+;
+
+const credits =
+    \\Créditos: 
+    \\Música por Maththew-pablo
+    \\opengameart.org/users/matthew-pablo
+    \\
+    \\Modelos dos animais por Quaternius
+    \\quaternius.com
+    \\
+    \\Código por Arthur R. P. So
+;
+
+fn line_count(comptime text: []const u8) i32 {
+    var count: i32 = 0;
+    for (text) |char| {
+        if (char == '\n') count += 1;
+    }
+    return count;
+}
+
+const State = enum { menu, intro_text, black_screen, finish_text, play_again };
 
 finished: bool = false,
 sound_enabled: bool,
@@ -53,9 +105,10 @@ light: rll.Light,
 start_btn: rl.Rectangle,
 
 sound_btn: rl.Rectangle,
-intro_text_offset: f32,
-intro_text_linecount: i32,
+text_offset: f32,
 black_screen_alpha: f32,
+
+play_again_btn: rl.Rectangle,
 
 pub fn init() Self {
     var self: Self = undefined;
@@ -93,17 +146,18 @@ pub fn init() Self {
     self.title_rotation = 0;
     self.start_btn = rl.Rectangle{ .width = 200, .height = 50, .x = (c.window_w - 200) / 2, .y = c.window_h - 160 };
     self.sound_btn = rl.Rectangle{ .width = 200, .height = 50, .x = (c.window_w - 200) / 2, .y = c.window_h - 100 };
-    self.intro_text_offset = c.window_h;
-    self.intro_text_linecount = blk: {
-        var count: i32 = 0;
-        for (intro_text) |char| {
-            if (char == '\n') count += 1;
-        }
-        break :blk count;
-    };
+    self.play_again_btn = rl.Rectangle{ .width = 300.0, .height = 75.0, .x = (c.window_w - 300) / 2, .y = c.window_h - 160 };
+    self.text_offset = c.window_h;
     self.black_screen_alpha = 0;
 
     return self;
+}
+
+pub fn start_ending(self: *Self) void {
+    self.finished = false;
+    self.black_screen_alpha = 1;
+    self.text_offset = c.window_h;
+    self.state = .finish_text;
 }
 
 pub fn deinit(self: Self) void {
@@ -125,6 +179,7 @@ pub fn process(self: *Self) void {
             const mouse_pos = rl.GetMousePosition();
             if (rl.IsMouseButtonPressed(0)) {
                 if (rl.CheckCollisionPointRec(mouse_pos, self.start_btn)) {
+                    self.text_offset = c.window_h;
                     self.state = .intro_text;
                 } else if (rl.CheckCollisionPointRec(mouse_pos, self.sound_btn)) {
                     self.sound_enabled = !self.sound_enabled;
@@ -133,18 +188,35 @@ pub fn process(self: *Self) void {
         },
         .intro_text => {
             if (rl.IsMouseButtonDown(0)) {
-                self.intro_text_offset -= 230 * delta;
+                self.text_offset -= 230 * delta;
             } else {
-                self.intro_text_offset -= 25 * delta;
+                self.text_offset -= 25 * delta;
             }
-            if (@as(i32, @intFromFloat(self.intro_text_offset)) <= self.intro_text_linecount * -23) {
+            if (@as(i32, @intFromFloat(self.text_offset)) <= line_count(intro_text) * -23) {
                 self.state = .black_screen;
             }
         },
         .black_screen => {
-            self.black_screen_alpha = self.black_screen_alpha + (0.5 * delta);
-            if (self.black_screen_alpha > 1) {
+            self.black_screen_alpha = @min(self.black_screen_alpha + (0.5 * delta), 1);
+            if (self.black_screen_alpha >= 1) {
                 self.finished = true;
+            }
+        },
+        .finish_text => {
+            self.black_screen_alpha = @max(self.black_screen_alpha - (0.5 * delta), 0);
+            if (rl.IsMouseButtonDown(0)) {
+                self.text_offset -= 230 * delta;
+            } else {
+                self.text_offset -= 25 * delta;
+            }
+
+            if (@as(i32, @intFromFloat(self.text_offset)) <= line_count(ending_text) * -23) {
+                self.state = .play_again;
+            }
+        },
+        .play_again => {
+            if (rl.IsMouseButtonPressed(0) and rl.CheckCollisionPointRec(rl.GetMousePosition(), self.play_again_btn)) {
+                self.state = .menu;
             }
         },
     }
@@ -186,12 +258,24 @@ pub fn process(self: *Self) void {
         },
         .intro_text => {
             rl.DrawRectangle(100, 0, c.window_w - 200, c.window_h, rl.Color{ .r = 0x00, .g = 0x00, .b = 0x00, .a = 0xaa });
-            rl.DrawText(intro_text, 110, @intFromFloat(self.intro_text_offset), 20, rl.WHITE);
+            rl.DrawText(intro_text, 110, @intFromFloat(self.text_offset), 20, rl.WHITE);
         },
         .black_screen => {
-            const alpha: u8 = @intFromFloat(rl.Clamp(self.black_screen_alpha, 0, 1) * 0xff);
+            const alpha: u8 = @intFromFloat(self.black_screen_alpha * 0xff);
             rl.DrawRectangle(100, 0, c.window_w - 200, c.window_h, rl.Color{ .r = 0x00, .g = 0x00, .b = 0x00, .a = 0xaa });
             rl.DrawRectangle(0, 0, c.window_w, c.window_h, rl.Color{ .r = 0x00, .g = 0x00, .b = 0x00, .a = alpha });
+        },
+        .finish_text => {
+            const alpha: u8 = @intFromFloat(self.black_screen_alpha * 0xff);
+            rl.DrawRectangle(0, 0, c.window_w, c.window_h, rl.Color{ .r = 0x00, .g = 0x00, .b = 0x00, .a = alpha });
+            rl.DrawRectangle(100, 0, c.window_w - 200, c.window_h, rl.Color{ .r = 0x00, .g = 0x00, .b = 0x00, .a = 0xaa });
+            rl.DrawText(ending_text, 110, @intFromFloat(self.text_offset), 20, rl.WHITE);
+        },
+        .play_again => {
+            rl.DrawRectangle(100, 0, c.window_w - 200, c.window_h, rl.Color{ .r = 0x00, .g = 0x00, .b = 0x00, .a = 0xaa });
+            rl.DrawText("Obrigado Por Jogar!", 110, 40, 30, rl.YELLOW);
+            rl.DrawText(credits, 110, 80, 20, rl.WHITE);
+            draw_button("Recomeçar", self.play_again_btn);
         },
     }
 }

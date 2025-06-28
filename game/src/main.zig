@@ -33,10 +33,10 @@ pub fn main() !void {
     var scene_mgr = try SceneManager.init(alloc);
     defer scene_mgr.deinit();
 
-    _ = scene_mgr.next();
     var world = try get_world(alloc, try scene_mgr.get_current());
     defer world.deinit();
 
+    var state: enum { inicio, meio, fim } = .inicio;
     while (!rl.WindowShouldClose()) {
         rl.UpdateMusicStream(music);
         timePlayed = rl.GetMusicTimePlayed(music) / rl.GetMusicTimeLength(music);
@@ -48,24 +48,34 @@ pub fn main() !void {
             rl.PauseMusicStream(music);
         }
 
-        if (menu.finished) {
-            menu.process();
-        } else {
-            try world.update();
-            world.render();
-
-            if (world.finished) {
-                scene_mgr.update_stats(world.stats);
-                if (world.player.alive) {
-                    if (!scene_mgr.next()) {
-                        break;
-                    }
+        switch (state) {
+            .inicio => {
+                menu.process();
+                if (menu.finished) {
+                    state = .meio;
                 }
+            },
+            .meio => {
+                try world.update();
+                world.render();
 
-                world.deinit();
-                world = try get_world(alloc, try scene_mgr.get_current());
-            }
+                if (world.finished) {
+                    scene_mgr.update_stats(world.stats);
+                    if (world.player.alive) {
+                        if (!scene_mgr.next()) {
+                            state = .fim;
+                            scene_mgr.current = 0;
+                        }
+                    }
 
+                    world.deinit();
+                    world = try get_world(alloc, try scene_mgr.get_current());
+                }
+            },
+            .fim => {
+                menu.start_ending();
+                state = .inicio;
+            },
         }
     }
 }
