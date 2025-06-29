@@ -165,7 +165,7 @@ pub fn get_current(self: *Self) !LevelArgs {
         4 => third_scene(self.gpa),
         5 => .{
             .level = try generate_level(&self.pcg, 4, .{
-                .diameter = 6,
+                .diameter = 1,
                 .max_corridor_length = 3,
                 .branch_chance = 0.25,
                 .min_branch_diameter = 2,

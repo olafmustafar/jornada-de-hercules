@@ -18,7 +18,7 @@ radius: f32,
 animation_frame: i32,
 inertia: rl.Vector2,
 shooting_cooldown: f32,
-flyer_move_target: ?rl.Vector2,
+move_target: ?rl.Vector2,
 
 activated: bool,
 player_hit: bool,
@@ -37,7 +37,7 @@ pub fn init(self: *World, pos: rl.Vector2, enemy: Enemy) Self {
         .animation_frame = 0,
         .inertia = rl.Vector2Zero(),
         .shooting_cooldown = 0,
-        .flyer_move_target = null,
+        .move_target = null,
         .activated = false,
         .player_hit = false,
     };
@@ -45,7 +45,7 @@ pub fn init(self: *World, pos: rl.Vector2, enemy: Enemy) Self {
     if (self.enemy_animations.get(enemy.type)) |anim| {
         ei.animation = anim.run;
     }
-    if (enemy.type == .boss and self.boss_type == .hydra) {
+    if (enemy.type == .boss) {
         switch (self.boss_type) {
             .lion => {},
             .hydra => {
@@ -53,7 +53,9 @@ pub fn init(self: *World, pos: rl.Vector2, enemy: Enemy) Self {
                 ei.enemy.velocity *= 0.5;
                 ei.enemy.health = 40;
             },
-            .stag => {},
+            .stag => {
+                ei.enemy.velocity *= 1.5;
+            },
         }
     }
 
@@ -137,19 +139,19 @@ pub fn update(self: *Self, curr_room: rl.Rectangle) !void {
             world.stats.enemies_hit_player += 1;
         }
         world.player.take_hit(@intFromFloat(self.enemy.damage * 50));
-    } else if (self.enemy.type == .flyer or (self.enemy.type == .boss and world.boss_type == .stag)) {
+    } else if (self.enemy.type == .flyer) {
         const previous = self.pos;
-        if (self.flyer_move_target == null or rl.Vector2Equals(self.flyer_move_target.?, self.pos) == 1) {
+        if (self.move_target == null or rl.Vector2Equals(self.move_target.?, self.pos) == 1) {
             var new_target = self.pos;
             const angle = @as(f32, @floatFromInt(rl.GetRandomValue(0, 360))) * rl.DEG2RAD;
             new_target = world.solve_collisions_flyer(rl.Vector2MoveTowards(new_target, rl.Vector2Add(new_target, rl.Vector2Rotate(c.vec2(0, 1), angle)), 0.5), self.radius);
             new_target = world.solve_collisions_flyer(rl.Vector2MoveTowards(new_target, world.player.position, 0.5), self.radius);
-            self.flyer_move_target = world.solve_collisions_flyer(new_target, self.radius);
+            self.move_target = world.solve_collisions_flyer(new_target, self.radius);
         }
 
         //in case it gets stuck
-        self.flyer_move_target = rl.Vector2MoveTowards(self.flyer_move_target.?, self.pos, 0.1 * delta);
-        self.pos = rl.Vector2MoveTowards(self.pos, self.flyer_move_target.?, step);
+        self.move_target = rl.Vector2MoveTowards(self.move_target.?, self.pos, 0.1 * delta);
+        self.pos = rl.Vector2MoveTowards(self.pos, self.move_target.?, step);
         self.pos = world.solve_collisions_flyer(self.pos, self.radius);
         self.angle = rl.Vector2Angle(c.vec2(0, 1), rl.Vector2Normalize(rl.Vector2Subtract(self.pos, previous))) * -rl.RAD2DEG;
     } else if (self.enemy.type == .boss and world.boss_type == .hydra) {
@@ -157,6 +159,32 @@ pub fn update(self: *Self, curr_room: rl.Rectangle) !void {
         const room = world.curr_room.?;
         self.pos = rl.Vector2MoveTowards(self.pos, c.vec2(room.x + (room.width / 2) - 0.5, room.y + (room.height / 2)), step);
         self.pos = world.solve_collisions(self.pos, self.radius);
+        self.angle = rl.Vector2Angle(c.vec2(0, 1), rl.Vector2Normalize(rl.Vector2Subtract(self.pos, previous))) * -rl.RAD2DEG;
+    } else if (self.enemy.type == .boss and world.boss_type == .stag) {
+        const running_triggers: [4]struct { area: rl.Rectangle, to: rl.Vector2 } = .{
+            .{ .area = .{ .x = 0, .y = 0, .width = 6, .height = 4 }, .to = c.vec2(9, 1) },
+            .{ .area = .{ .x = 6, .y = 0, .width = 6, .height = 4 }, .to = c.vec2(9, 6) },
+            .{ .area = .{ .x = 6, .y = 4, .width = 6, .height = 4 }, .to = c.vec2(2, 6) },
+            .{ .area = .{ .x = 0, .y = 4, .width = 6, .height = 4 }, .to = c.vec2(2, 1) },
+        };
+        const central = rl.Rectangle{ .x = 5 + world.curr_room.?.x, .y = 3 + world.curr_room.?.y, .width = 2, .height = 2 };
+        const previous = self.pos;
+        if (!rl.CheckCollisionPointRec(world.player.position, central)) {
+            for (running_triggers) |trigger| {
+                if (rl.CheckCollisionPointRec(world.player.position, rl.Rectangle{
+                    .x = trigger.area.x + world.curr_room.?.x,
+                    .y = trigger.area.y + world.curr_room.?.y,
+                    .width = trigger.area.width,
+                    .height = trigger.area.height,
+                })) {
+                    self.move_target = (c.vec2(
+                        trigger.to.x + world.curr_room.?.x + 0.5,
+                        trigger.to.y + world.curr_room.?.y + 0.5,
+                    ));
+                }
+            }
+        }
+        if (self.move_target) |target| self.pos = rl.Vector2MoveTowards(self.pos, target, step);
         self.angle = rl.Vector2Angle(c.vec2(0, 1), rl.Vector2Normalize(rl.Vector2Subtract(self.pos, previous))) * -rl.RAD2DEG;
     } else {
         const previous = self.pos;
