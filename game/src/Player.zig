@@ -155,7 +155,11 @@ fn attack(self: *Self) void {
     rl.PlaySound(AudioMgr.get().swoosh);
     for (world.enemies.items) |*e| {
         if (e.alive and self.check_hit_collision(e.pos, e.radius)) {
-            e.health_points -= 10;
+            if (e.enemy.type == .boss and world.boss_type == .stag) {
+                e.alive = false;
+                world.particles.start(World.to_world_pos(e.pos));
+                world.dialog = .init("Hércules", &[_][]const u8{"Corça capturada!"});
+            }
             if (e.health_points <= 0) {
                 rl.PlaySound(AudioMgr.get().enemy_die);
                 world.particles.start(World.to_world_pos(e.pos));
@@ -171,7 +175,7 @@ fn attack(self: *Self) void {
 
 fn check_hit_collision(self: Self, other: rl.Vector2, other_radius: f32) bool {
     const angl = self.look_angle();
-    const hit_radius = 0.3;
+    const hit_radius = 0.5;
     const hit_circle = rl.Vector2Add(self.position, rl.Vector2Scale(c.vec2(rl.cosf(angl), rl.sinf(angl)), 0.5));
     return (rl.CheckCollisionCircles(hit_circle, hit_radius, other, other_radius) or
         rl.CheckCollisionCircles(self.position, hit_radius, other, other_radius));
