@@ -43,6 +43,7 @@ const Bullet = struct {
     pos: rl.Vector2,
     vector: rl.Vector2,
     dmg: i32,
+    collide_with_walls: bool,
 };
 
 pub const Animations = struct {
@@ -273,7 +274,6 @@ pub fn init(
         }
     }
 
-
     for (self.models.items) |model| {
         for (0..@intCast(model.materialCount)) |i| {
             model.materials[i].shader = self.shader;
@@ -383,7 +383,9 @@ pub fn update(self: *Self) !void {
     for (self.bullets.items) |*e| {
         if (!e.alive) continue;
         e.pos = rl.Vector2Add(e.pos, e.vector);
-        if (self.curr_room != null and !rl.CheckCollisionPointRec(e.pos, self.curr_room.?)) {
+        if ((self.curr_room != null and !rl.CheckCollisionPointRec(e.pos, self.curr_room.?)) or
+            (e.collide_with_walls and self.has_collision(e.pos, 0.1)))
+        {
             e.alive = false;
         } else if (rl.CheckCollisionCircles(self.player.position, self.player.radius, e.pos, 0.2)) {
             self.player.take_hit(e.dmg);
@@ -550,6 +552,17 @@ fn solve_collisions_impl(self: *Self, circ: rl.Vector2, radius: f32, is_flyer: b
         }
     }
     return res;
+}
+
+pub fn has_collision(self: *Self, circ: rl.Vector2, radius: f32) bool {
+    const r = radius;
+    for (self.collidable_tiles.items) |tile| {
+        const rec = rl.Rectangle{ .x = tile.pos.x - 0.5, .y = tile.pos.y - 0.5, .width = 1, .height = 1 };
+        if (rl.CheckCollisionCircleRec(circ, r, rec)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 fn load_animation(self: *Self, enemy_type: Enemy.Type, name: []const u8, atk_idx: usize, idle_idx: usize, run_idx: usize) !void {

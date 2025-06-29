@@ -119,8 +119,7 @@ pub fn deinit(self: *Self) void {
 }
 
 pub fn next(self: *Self) bool {
-    if (self.current == 0) return false;
-    // if (self.current == 6) return false;
+    if (self.current == 6) return false;
 
     self.current += 1;
     return true;
@@ -144,7 +143,7 @@ pub fn get_current(self: *Self) !LevelArgs {
                 .min_branch_diameter = 2,
                 .max_branch_diameter = 5,
                 .change_direction_chance = 0.25,
-            }),
+            }, false),
             .tint = yellow,
             .tiles = normal_tiles,
             .boss = .lion,
@@ -158,7 +157,7 @@ pub fn get_current(self: *Self) !LevelArgs {
                 .min_branch_diameter = 1,
                 .max_branch_diameter = 1,
                 .change_direction_chance = 0.30,
-            }),
+            }, true),
             .tint = green,
             .boss = .hydra,
             .tiles = swamp_tiles,
@@ -172,7 +171,7 @@ pub fn get_current(self: *Self) !LevelArgs {
                 .min_branch_diameter = 2,
                 .max_branch_diameter = 5,
                 .change_direction_chance = 0.25,
-            }),
+            }, false),
             .tint = light_green,
             .tiles = normal_tiles,
             .boss = .stag,
@@ -181,9 +180,10 @@ pub fn get_current(self: *Self) !LevelArgs {
         else => unreachable,
     };
 }
-fn generate_level(pcg: *PCGManager, difficulty: usize, architecture: ArchitectureArgs) !Level {
+
+fn generate_level(pcg: *PCGManager, difficulty: usize, architecture: ArchitectureArgs, generate_boss_room_obstacles: bool) !Level {
     pcg.context.difficulty_level = difficulty;
-    try pcg.generate(.{ .rooms = .{ .generate = .{} } });
+    try pcg.generate(.{ .rooms = .{ .generate = .{ .generate_obstacles_in_boss_room = generate_boss_room_obstacles } } });
     try pcg.generate(.{ .enemies = .{ .generate = .{} } });
     try pcg.generate(.{ .architecture = .{ .generate = architecture } });
     return try pcg.retrieve_level();

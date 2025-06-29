@@ -88,6 +88,7 @@ pub fn update(self: *Self, curr_room: rl.Rectangle) !void {
                 .dmg = @intFromFloat(self.enemy.damage * 50),
                 .pos = self.pos,
                 .vector = rl.Vector2Scale(rl.Vector2Normalize(rl.Vector2Subtract(target, self.pos)), bullet_vel),
+                .collide_with_walls = false,
             });
         } else {
             self.shooting_cooldown -= delta;
@@ -104,18 +105,21 @@ pub fn update(self: *Self, curr_room: rl.Rectangle) !void {
                 .dmg = @intFromFloat(self.enemy.damage * 50),
                 .pos = self.pos,
                 .vector = rl.Vector2Scale(rl.Vector2Rotate(c.vec2(0, 1), target_rad - (30 * rl.DEG2RAD)), bullet_vel),
+                .collide_with_walls = true,
             });
             try world.bullets.append(.{
                 .alive = true,
                 .dmg = @intFromFloat(self.enemy.damage * 50),
                 .pos = self.pos,
                 .vector = rl.Vector2Scale(rl.Vector2Rotate(c.vec2(0, 1), target_rad), bullet_vel),
+                .collide_with_walls = true,
             });
             try world.bullets.append(.{
                 .alive = true,
                 .dmg = @intFromFloat(self.enemy.damage * 50),
                 .pos = self.pos,
                 .vector = rl.Vector2Scale(rl.Vector2Rotate(c.vec2(0, 1), target_rad + (30 * rl.DEG2RAD)), bullet_vel),
+                .collide_with_walls = true,
             });
         } else {
             self.shooting_cooldown -= delta;
@@ -171,7 +175,11 @@ pub fn update(self: *Self, curr_room: rl.Rectangle) !void {
             self.pos = rl.Vector2MoveTowards(self.pos, world.player.position, step);
             self.pos = world.solve_collisions(self.pos, self.radius);
         }
-        self.angle = rl.Vector2Angle(c.vec2(0, 1), rl.Vector2Normalize(rl.Vector2Subtract(self.pos, previous))) * -rl.RAD2DEG;
+        if (self.enemy.type == .shooter or self.enemy.type == .predict_shooter) {
+            self.angle = c.look_target_rad(self.pos, world.player.position) * -rl.RAD2DEG;
+        } else {
+            self.angle = rl.Vector2Angle(c.vec2(0, 1), rl.Vector2Normalize(rl.Vector2Subtract(self.pos, previous))) * -rl.RAD2DEG;
+        }
     }
 
     if (self.animation) |animation| {
@@ -184,6 +192,7 @@ pub fn update(self: *Self, curr_room: rl.Rectangle) !void {
 pub fn render(self: Self) void {
     if (!self.alive) return;
     const world = World.get();
+
     const tint = switch (self.enemy.type) {
         .cornering_chaser => rl.RED,
         .predict_shooter => rl.YELLOW,

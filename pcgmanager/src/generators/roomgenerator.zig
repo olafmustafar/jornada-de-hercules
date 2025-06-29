@@ -9,9 +9,9 @@ const Context = @import("../Context.zig");
 const Generator = @import("Generator.zig").Generator;
 
 const InstructionTag = enum { generate };
-
+const GenerateArgs = struct { generate_obstacles_in_boss_room: bool = false };
 pub const Instruction = union(InstructionTag) {
-    generate: struct { dummy: i32 = 0 },
+    generate: GenerateArgs,
 };
 
 const Prefab = struct { []const u8, []const struct { usize, usize } };
@@ -115,6 +115,19 @@ const prefabs = [_]Prefab{
     },
 };
 
+const boss_room_obstacles = Prefab{
+    \\####....####
+    \\##....#...##
+    \\#..........#
+    \\...#........
+    \\........#...
+    \\#..........#
+    \\##...#....##
+    \\####....####
+    ,
+    &.{.{ 5, 3 }},
+};
+
 const boss_room = Prefab{
     \\####....####
     \\##........##
@@ -143,15 +156,15 @@ const enemy_sets = [_][]const Enemy.Type{
 
 fn generate(ctx: *Context, instruction: Instruction) Rooms {
     switch (instruction) {
-        .generate => |_| {
-            return generate_rooms(ctx) catch {
+        .generate => |args| {
+            return generate_rooms(ctx, args) catch {
                 unreachable;
             };
         },
     }
 }
 
-fn generate_rooms(ctx: *Context) !Rooms {
+fn generate_rooms(ctx: *Context, args: GenerateArgs) !Rooms {
     const alloc = ctx.gpa;
     const rnd = ctx.random.random();
     var rooms = Rooms{
@@ -176,7 +189,7 @@ fn generate_rooms(ctx: *Context) !Rooms {
         try rooms.normal_rooms.append(room);
     }
 
-    const room_str, const placeholders = boss_room;
+    const room_str, const placeholders = if (args.generate_obstacles_in_boss_room) boss_room_obstacles else boss_room;
     var room = Room{
         .enemies = .init(alloc),
         .type = .boss_room,
