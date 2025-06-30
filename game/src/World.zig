@@ -314,7 +314,6 @@ pub fn update(self: *Self) !void {
         self.display_debug = !self.display_debug;
     }
 
-    self.curr_room = null;
     for (self.level.room_rects.items) |room_rec| {
         const rlrec = rl.Rectangle{ .x = room_rec.x - 0.5, .y = room_rec.y - 0.5, .width = room_rec.w, .height = room_rec.h };
         if (rl.CheckCollisionPointRec(self.player.position, rlrec)) {
@@ -514,6 +513,10 @@ fn set(world: *Self) void {
 
 pub fn to_world_pos_y(pos: rl.Vector2, y: f32) rl.Vector3 {
     return vec3(pos.x * 0.90, y, pos.y * 0.90);
+}
+
+pub fn to_world_rec(rec: rl.Rectangle) rl.Rectangle {
+    return .{ .x = rec.x * 0.90, .y = rec.y * 0.90, .width = rec.width * 0.90, .height = rec.height * 0.90 };
 }
 
 pub fn to_world_pos(pos: rl.Vector2) rl.Vector3 {

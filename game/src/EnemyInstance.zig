@@ -19,6 +19,7 @@ animation_frame: i32,
 inertia: rl.Vector2,
 shooting_cooldown: f32,
 move_target: ?rl.Vector2,
+move_target_timer: f32,
 
 activated: bool,
 player_hit: bool,
@@ -38,6 +39,7 @@ pub fn init(self: *World, pos: rl.Vector2, enemy: Enemy) Self {
         .inertia = rl.Vector2Zero(),
         .shooting_cooldown = 0,
         .move_target = null,
+        .move_target_timer = 0.00,
         .activated = false,
         .player_hit = false,
     };
@@ -142,17 +144,16 @@ pub fn update(self: *Self, curr_room: rl.Rectangle) !void {
         world.player.take_hit(@intFromFloat(self.enemy.damage * 50));
     } else if (self.enemy.type == .flyer) {
         const previous = self.pos;
-        if (self.move_target == null or rl.Vector2Equals(self.move_target.?, self.pos) == 1) {
-            var new_target = self.pos;
+        if (self.move_target_timer > 0) {
+            self.move_target_timer -= delta;
+        } else {
             const angle = @as(f32, @floatFromInt(rl.GetRandomValue(0, 360))) * rl.DEG2RAD;
-            new_target = world.solve_collisions_flyer(rl.Vector2MoveTowards(new_target, rl.Vector2Add(new_target, rl.Vector2Rotate(c.vec2(0, 1), angle)), 0.5), self.radius);
-            new_target = world.solve_collisions_flyer(rl.Vector2MoveTowards(new_target, world.player.position, 0.5), self.radius);
-            self.move_target = world.solve_collisions_flyer(new_target, self.radius);
+            self.move_target = rl.Vector2Add(rl.Vector2Rotate(c.vec2(0, 1), angle), self.pos);
+            self.move_target = rl.Vector2MoveTowards(self.move_target.?, world.player.position, 0.8);
+            self.move_target = rl.Vector2Subtract(self.move_target.?, self.pos);
+            self.move_target_timer = 0.10;
         }
-
-        //in case it gets stuck
-        self.move_target = rl.Vector2MoveTowards(self.move_target.?, self.pos, 0.1 * delta);
-        self.pos = rl.Vector2MoveTowards(self.pos, self.move_target.?, step);
+        self.pos = rl.Vector2MoveTowards(self.pos, rl.Vector2Add(self.pos, self.move_target.?), step);
         self.pos = world.solve_collisions_flyer(self.pos, self.radius);
         self.angle = rl.Vector2Angle(c.vec2(0, 1), rl.Vector2Normalize(rl.Vector2Subtract(self.pos, previous))) * -rl.RAD2DEG;
     } else if (self.enemy.type == .boss and world.boss_type == .hydra) {
@@ -224,7 +225,7 @@ pub fn render(self: Self) void {
 
     const tint = switch (self.enemy.type) {
         .cornering_chaser => rl.RED,
-        .predict_shooter => rl.YELLOW,
+        .predict_shooter => rl.RED,
         .fast_chaser => rl.GREEN,
         else => rl.WHITE,
     };
