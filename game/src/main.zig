@@ -32,7 +32,6 @@ pub fn main() !void {
 
     var scene_mgr = try SceneManager.init(alloc);
     defer scene_mgr.deinit();
-    scene_mgr.current = 5;
 
     var world = try get_world(alloc, try scene_mgr.get_current());
     defer world.deinit();

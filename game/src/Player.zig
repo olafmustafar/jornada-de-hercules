@@ -155,6 +155,7 @@ fn attack(self: *Self) void {
     rl.PlaySound(AudioMgr.get().swoosh);
     for (world.enemies.items) |*e| {
         if (e.alive and self.check_hit_collision(e.pos, e.radius)) {
+            e.health_points -= 10;
             if (e.enemy.type == .boss and world.boss_type == .stag) {
                 e.alive = false;
                 world.particles.start(World.to_world_pos(e.pos));
