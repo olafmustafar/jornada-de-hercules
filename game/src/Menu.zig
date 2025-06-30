@@ -139,7 +139,7 @@ pub fn init() Self {
     self.frame = 0;
 
     self.finished = false;
-    self.sound_enabled = true;
+    self.sound_enabled = false;
     self.state = .menu;
     self.image = rl.LoadImage("assets/title.png");
     self.texture = rl.LoadTextureFromImage(self.image);

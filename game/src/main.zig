@@ -13,7 +13,7 @@ const AudioMgr = @import("AudioMgr.zig");
 pub fn main() !void {
     const alloc = std.heap.c_allocator;
     rl.SetConfigFlags(rl.FLAG_MSAA_4X_HINT);
-    rl.InitWindow(c.window_w, c.window_h, "raylib [core] example - basic window");
+    rl.InitWindow(c.window_w, c.window_h, "A Jornada de Hércules");
     rl.SetTargetFPS(60);
     defer rl.CloseWindow();
 
@@ -21,7 +21,6 @@ pub fn main() !void {
     defer rl.CloseAudioDevice();
     const music = rl.LoadMusicStream("assets/Woodland-Fantasy.wav");
     defer rl.UnloadMusicStream(music);
-    var timePlayed: f32 = undefined;
     rl.PlayMusicStream(music);
 
     const audio_mgr = AudioMgr.init();
@@ -39,8 +38,7 @@ pub fn main() !void {
     var state: enum { inicio, meio, fim } = .inicio;
     while (!rl.WindowShouldClose()) {
         rl.UpdateMusicStream(music);
-        timePlayed = rl.GetMusicTimePlayed(music) / rl.GetMusicTimeLength(music);
-        if (timePlayed > 1.0) timePlayed = 1.0;
+        _ = rl.GetMusicTimePlayed(music) / rl.GetMusicTimeLength(music);
 
         if (menu.sound_enabled) {
             rl.ResumeMusicStream(music);

@@ -126,7 +126,7 @@ pub fn next(self: *Self) bool {
 }
 
 pub fn update_stats(self: *Self, stats: World.Stats) void {
-    if (std.mem.containsAtLeastScalar(i32, &[_]i32{ 1, 3, 4 }, 1, self.current)) {
+    if (std.mem.containsAtLeastScalar(i32, &[_]i32{ 1, 3, 5 }, 1, self.current)) {
         self.pcg.context.rate_bullets_hit = c.as_f32(stats.bullets_hit) / c.as_f32(stats.bullets_shot);
         self.pcg.context.enemy_hit_rate = c.as_f32(stats.enemies_hit_player) / c.as_f32(stats.enemies_activated);
     }

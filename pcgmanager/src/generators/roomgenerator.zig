@@ -230,21 +230,21 @@ fn get_random_enemy_set(ctx: *Context, rnd: std.Random, size: usize) [4]?Enemy.T
         const chance = rnd.float(f32);
 
         if (enemy == .shooter) {
-            if (ctx.rate_bullets_hit <= 0.8) {
-                result[i] = if (chance < 0.5) .shooter else .walking_shooter;
-            } else if (ctx.rate_bullets_hit <= 5) {
+            if (ctx.rate_bullets_hit <= 0.3) {
+                result[i] = if (chance < 0.5) .predict_shooter else .walking_shooter;
+            } else if (ctx.rate_bullets_hit <= 0.5) {
                 result[i] = if (chance < 0.33)
                     .predict_shooter
                 else if (chance < 0.66)
                     .walking_shooter
                 else
                     .shooter;
-            } else if (ctx.rate_bullets_hit <= 0.3) {
-                result[i] = if (chance < 0.5) .predict_shooter else .walking_shooter;
+            } else if (ctx.rate_bullets_hit <= 0.8) {
+                result[i] = if (chance < 0.5) .shooter else .walking_shooter;
             }
         } else if (enemy == .slow_chaser) {
-            if (ctx.enemy_hit_rate <= 0.8) {
-                result[i] = if (chance < 0.5) .cornering_chaser else .slow_chaser;
+            if (ctx.enemy_hit_rate <= 0.3) {
+                result[i] = if (chance < 0.5) .cornering_chaser else .fast_chaser;
             } else if (ctx.enemy_hit_rate <= 0.5) {
                 result[i] = if (chance < 0.33)
                     .cornering_chaser
@@ -252,8 +252,8 @@ fn get_random_enemy_set(ctx: *Context, rnd: std.Random, size: usize) [4]?Enemy.T
                     .fast_chaser
                 else
                     .slow_chaser;
-            } else if (ctx.enemy_hit_rate <= 0.3) {
-                result[i] = if (chance < 0.5) .cornering_chaser else .fast_chaser;
+            } else if (ctx.enemy_hit_rate <= 0.8) {
+                result[i] = if (chance < 0.5) .cornering_chaser else .slow_chaser;
             }
         }
     }

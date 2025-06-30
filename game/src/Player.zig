@@ -176,7 +176,7 @@ fn attack(self: *Self) void {
 
 fn check_hit_collision(self: Self, other: rl.Vector2, other_radius: f32) bool {
     const angl = self.look_angle();
-    const hit_radius = 0.5;
+    const hit_radius = 0.4;
     const hit_circle = rl.Vector2Add(self.position, rl.Vector2Scale(c.vec2(rl.cosf(angl), rl.sinf(angl)), 0.5));
     return (rl.CheckCollisionCircles(hit_circle, hit_radius, other, other_radius) or
         rl.CheckCollisionCircles(self.position, hit_radius, other, other_radius));

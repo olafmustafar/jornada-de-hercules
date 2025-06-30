@@ -2,7 +2,7 @@ const rl = @import("raylib.zig");
 
 const Self = @This();
 
-var g_sounds: ?Self = undefined;
+var g_sounds: ?Self = null;
 
 enemy_die: rl.Sound,
 hit: rl.Sound,

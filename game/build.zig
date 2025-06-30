@@ -10,11 +10,17 @@ pub fn compile_for_desktop(b: *std.Build, target: std.Build.ResolvedTarget) void
         .optimize = optimize,
     });
 
-    const pcgmanager = b.dependency("pcgmanager", .{});
+    const pcgmanager = b.dependency("pcgmanager", .{
+        .target = target,
+        .optimize = optimize,
+    });
     exe_mod.addImport("pcgmanager", pcgmanager.module("root"));
     exe_mod.linkLibrary(pcgmanager.artifact("pcgmanager"));
 
-    const ray = b.dependency("raylib", .{});
+    const ray = b.dependency("raylib", .{
+        .target = target,
+        .optimize = optimize,
+    });
     exe_mod.linkLibrary(ray.artifact("raylib"));
 
     const exe = b.addExecutable(.{

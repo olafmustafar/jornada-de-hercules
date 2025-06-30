@@ -52,6 +52,7 @@ pub fn init(self: *World, pos: rl.Vector2, enemy: Enemy) Self {
                 ei.radius = 0.5;
                 ei.enemy.velocity *= 0.5;
                 ei.enemy.health = 40;
+                ei.health_points = 40;
             },
             .stag => {
                 ei.enemy.velocity *= 1.5;
@@ -74,7 +75,7 @@ pub fn update(self: *Self, curr_room: rl.Rectangle) !void {
         self.activated = true;
     }
 
-    const bullet_vel = 0.1;
+    const bullet_vel = 4.5 * delta;
     if (self.enemy.type == .shooter or self.enemy.type == .walking_shooter or self.enemy.type == .predict_shooter) {
         if (self.shooting_cooldown <= 0) {
             self.shooting_cooldown = 2.3 - (self.enemy.shooting_velocity * 2);

@@ -21,7 +21,7 @@ const Particles = @import("Particles.zig");
 
 const glsl_version: i32 = if (builtin.target.cpu.arch.isWasm()) 100 else 330;
 
-var g_world: ?*Self = undefined;
+var g_world: ?*Self = null;
 
 const Self = @This();
 
@@ -108,7 +108,7 @@ door_open: rl.Model,
 door_closed: rl.Model,
 
 dialog: ?Dialog,
-display_debug: bool = false,
+display_debug: bool,
 
 arrows_controls_texture: rl.Texture2D,
 attack_controls_texture: rl.Texture2D,
@@ -123,6 +123,7 @@ pub fn init(
     tile_models: std.EnumArray(Tile, ?[]const u8),
 ) !Self {
     var self: Self = undefined;
+    self.display_debug = false;
     self.level = level;
     self.level_tint = level_tint;
     self.boss_type = boss_type;

@@ -102,7 +102,7 @@ fn combine_impl(self: Self, architecture: Architecture, rooms: Rooms, enemies_ma
         if (node.is_spawn) {
             var tilemap = try Tilemap.from_string(self.gpa, spawn_tilemap);
             defer tilemap.deinit();
-            try level.placeholders.append(.{ .position = .init(@as(i32, @intCast(x)) + 5, @as(i32, @intCast(y)) + 2), .entity = .{ .player = {} } });
+            try level.placeholders.append(.{ .position = .init(@as(i32, @intCast(x)) + 6, @as(i32, @intCast(y)) + 2), .entity = .{ .player = {} } });
             for (0..tilemap.width) |rx| {
                 for (0..tilemap.height) |ry| {
                     level.tilemap.set(x + rx + 1, y + ry + 1, tilemap.get(rx, ry).*);

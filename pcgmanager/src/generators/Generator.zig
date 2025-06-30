@@ -48,7 +48,7 @@ pub fn GeneratorImpl(
         }
 
         pub fn wait_results(self: *Self) !std.ArrayList(Content) {
-            for (self.queue.items) |instr| {
+            while ( self.queue.pop()) |instr| {
                 const content = GenFn(self.gen_context, instr);
                 try self.result.append(content);
             }
