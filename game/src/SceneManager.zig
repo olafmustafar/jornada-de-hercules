@@ -351,6 +351,7 @@ fn finish_scene(alloc: std.mem.Allocator) !LevelArgs {
                 },
             } } });
             try level.room_rects.append(.{ .x = 4, .y = 9, .w = 14, .h = 6 });
+            try level.room_rects.append(.{ .x = 8, .y = 14, .w = 6, .h = 4 });
             try level.placeholders.append(.{ .position = .init(10, 9), .entity = .{ .exit = .up } });
             try level.placeholders.append(.{ .position = .init(11, 9), .entity = .{ .exit = .up } });
             break :blk level;
