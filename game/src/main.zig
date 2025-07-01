@@ -64,6 +64,8 @@ pub fn main() !void {
                             state = .fim;
                             scene_mgr.current = 0;
                         }
+                    } else {
+                        scene_mgr.set_reduce_difficulty();
                     }
 
                     world.deinit();

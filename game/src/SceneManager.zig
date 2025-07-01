@@ -102,12 +102,14 @@ const Self = @This();
 pcg: PCGManager,
 current: i32,
 gpa: std.mem.Allocator,
+reduce_difficulty: bool,
 
 pub fn init(alloc: std.mem.Allocator) !Self {
     var self = Self{
         .pcg = try PCGManager.init(alloc),
         .current = 0,
         .gpa = alloc,
+        .reduce_difficulty = false,
     };
     self.pcg.context.enemy_hit_rate = 0.8;
     self.pcg.context.rate_bullets_hit = 0.8;
@@ -125,6 +127,10 @@ pub fn next(self: *Self) bool {
     return true;
 }
 
+pub fn set_reduce_difficulty(self: *Self) void {
+    self.reduce_difficulty = true;
+}
+
 pub fn update_stats(self: *Self, stats: World.Stats) void {
     if (std.mem.containsAtLeastScalar(i32, &[_]i32{ 1, 3, 5 }, 1, self.current)) {
         self.pcg.context.rate_bullets_hit = c.as_f32(stats.bullets_hit) / c.as_f32(stats.bullets_shot);
@@ -136,7 +142,7 @@ pub fn get_current(self: *Self) !LevelArgs {
     return switch (self.current) {
         0 => initial_scene(self.gpa),
         1 => .{
-            .level = try generate_level(&self.pcg, 4, .{
+            .level = try self.generate_level(4, .{
                 .diameter = 3,
                 .max_corridor_length = 3,
                 .branch_chance = 0.25,
@@ -150,7 +156,7 @@ pub fn get_current(self: *Self) !LevelArgs {
         },
         2 => second_scene(self.gpa),
         3 => .{
-            .level = try generate_level(&self.pcg, 4, .{
+            .level = try self.generate_level(4, .{
                 .diameter = 5,
                 .max_corridor_length = 2,
                 .branch_chance = 0.25,
@@ -164,7 +170,7 @@ pub fn get_current(self: *Self) !LevelArgs {
         },
         4 => third_scene(self.gpa),
         5 => .{
-            .level = try generate_level(&self.pcg, 4, .{
+            .level = try self.generate_level(4, .{
                 .diameter = 6,
                 .max_corridor_length = 3,
                 .branch_chance = 0.25,
@@ -181,12 +187,15 @@ pub fn get_current(self: *Self) !LevelArgs {
     };
 }
 
-fn generate_level(pcg: *PCGManager, difficulty: usize, architecture: ArchitectureArgs, generate_boss_room_obstacles: bool) !Level {
-    pcg.context.difficulty_level = difficulty;
-    try pcg.generate(.{ .rooms = .{ .generate = .{ .generate_obstacles_in_boss_room = generate_boss_room_obstacles } } });
-    try pcg.generate(.{ .enemies = .{ .generate = .{} } });
-    try pcg.generate(.{ .architecture = .{ .generate = architecture } });
-    return try pcg.retrieve_level();
+fn generate_level(self: *Self, difficulty: usize, architecture: ArchitectureArgs, generate_boss_room_obstacles: bool) !Level {
+    self.pcg.context.difficulty_level = if (self.reduce_difficulty) difficulty - 1 else difficulty;
+    if (self.reduce_difficulty) {
+        self.reduce_difficulty = false;
+    }
+    try self.pcg.generate(.{ .rooms = .{ .generate = .{ .generate_obstacles_in_boss_room = generate_boss_room_obstacles } } });
+    try self.pcg.generate(.{ .enemies = .{ .generate = .{} } });
+    try self.pcg.generate(.{ .architecture = .{ .generate = architecture } });
+    return try self.pcg.retrieve_level();
 }
 
 fn initial_scene(alloc: std.mem.Allocator) !LevelArgs {
