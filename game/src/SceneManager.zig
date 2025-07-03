@@ -14,6 +14,7 @@ pub const LevelArgs = struct {
     boss: World.BossType = .lion,
     tint: rl.Color = rl.WHITE,
     tiles: std.EnumArray(contents.Tile, ?[]const u8),
+    level_name: []const u8,
 };
 
 const ArchitectureArgs = std.meta.TagPayloadByName(std.meta.TagPayloadByName(PCGManager.Instruction, "architecture"), "generate");
@@ -142,6 +143,7 @@ pub fn get_current(self: *Self) !LevelArgs {
     return switch (self.current) {
         0 => initial_scene(self.gpa),
         1 => .{
+            .level_name = "Level 1 de 3",
             .level = try self.generate_level(4, .{
                 .diameter = 3,
                 .max_corridor_length = 3,
@@ -156,6 +158,7 @@ pub fn get_current(self: *Self) !LevelArgs {
         },
         2 => second_scene(self.gpa),
         3 => .{
+            .level_name = "Level 2 de 3",
             .level = try self.generate_level(4, .{
                 .diameter = 5,
                 .max_corridor_length = 2,
@@ -170,6 +173,7 @@ pub fn get_current(self: *Self) !LevelArgs {
         },
         4 => third_scene(self.gpa),
         5 => .{
+            .level_name = "Level 3 de 3",
             .level = try self.generate_level(4, .{
                 .diameter = 6,
                 .max_corridor_length = 3,
@@ -200,6 +204,7 @@ fn generate_level(self: *Self, difficulty: usize, architecture: ArchitectureArgs
 
 fn initial_scene(alloc: std.mem.Allocator) !LevelArgs {
     return .{
+        .level_name = "Prólogo",
         .level = blk: {
             var level = try Level.from_string(alloc, spawn);
             try level.placeholders.append(.{ .position = .init(10, 16), .entity = .{ .player = {} } });
@@ -239,6 +244,7 @@ fn initial_scene(alloc: std.mem.Allocator) !LevelArgs {
 
 fn second_scene(alloc: std.mem.Allocator) !LevelArgs {
     return LevelArgs{
+        .level_name = "Prólogo Level 2",
         .level = blk: {
             var level = try Level.from_string(alloc, spawn);
             try level.placeholders.append(.{ .position = .init(10, 14), .entity = .{ .player = {} } });
@@ -280,6 +286,7 @@ fn second_scene(alloc: std.mem.Allocator) !LevelArgs {
 
 fn third_scene(alloc: std.mem.Allocator) !LevelArgs {
     return .{
+        .level_name = "Prólogo Level 3",
         .level = blk: {
             var level = try Level.from_string(alloc, spawn);
             try level.placeholders.append(.{ .position = .init(10, 14), .entity = .{ .player = {} } });
@@ -323,6 +330,7 @@ fn third_scene(alloc: std.mem.Allocator) !LevelArgs {
 
 fn finish_scene(alloc: std.mem.Allocator) !LevelArgs {
     return .{
+        .level_name = "Epílogo",
         .level = blk: {
             var level = try Level.from_string(alloc, finish);
             try level.placeholders.append(.{ .position = .init(10, 16), .entity = .{ .player = {} } });

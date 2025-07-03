@@ -77,6 +77,7 @@ tile_models: std.EnumArray(Tile, ?rl.Model),
 models: std.ArrayList(rl.Model),
 models_animations: std.ArrayList(Animations),
 collidable_tiles: std.ArrayList(TileInstance),
+level_title: []const u8,
 
 camera: rl.Camera3D,
 player: Player,
@@ -121,6 +122,7 @@ pub fn init(
     boss_type: BossType,
     level_tint: rl.Color,
     tile_models: std.EnumArray(Tile, ?[]const u8),
+    level_title: []const u8,
 ) !Self {
     var self: Self = undefined;
     self.display_debug = false;
@@ -134,6 +136,7 @@ pub fn init(
     self.bullet_model = rl.LoadModel("assets/bullet.glb");
     self.npcs = .init(allocator);
     self.dialog = null;
+    self.level_title = level_title;
     self.stats = Stats{};
     try self.models.append(self.bullet_model);
     self.finished = false;
@@ -462,6 +465,8 @@ pub fn render(self: Self) void {
     rl.DrawRectangle(25, 25, 100, 20, rl.GRAY);
     rl.DrawRectangle(25, 25, @as(i32, @intFromFloat(life * 100.0)), 20, rl.RED);
     rl.DrawText("HP", 25, 25, 20, rl.WHITE);
+    rl.DrawText(@ptrCast(self.level_title), 140 , 25, 20, rl.YELLOW);
+
     const y = 15;
     var x: i32 = window_w - 20;
     const txt_mover = "Mover :";
@@ -473,7 +478,7 @@ pub fn render(self: Self) void {
 
     x -= rl.MeasureText(txt_atacar, 20);
     x -= 10;
-    rl.DrawText(txt_atacar, x, y + 5, 20, rl.WHITE);
+    rl.DrawText(txt_atacar, x, 25, 20, rl.WHITE);
 
     x -= @intFromFloat(c.as_f32(self.arrows_controls_texture.width) * scale);
     x -= 20;
@@ -481,7 +486,7 @@ pub fn render(self: Self) void {
 
     x -= rl.MeasureText(txt_mover, 20);
     x -= 10;
-    rl.DrawText(txt_mover, x, y + 5, 20, rl.WHITE);
+    rl.DrawText(txt_mover, x, 25, 20, rl.WHITE);
 
     if (self.dialog) |dialog| dialog.render();
 

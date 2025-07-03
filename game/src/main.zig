@@ -81,5 +81,5 @@ pub fn main() !void {
 }
 
 fn get_world(alloc: std.mem.Allocator, args: SceneManager.LevelArgs) !World {
-    return try World.init(alloc, args.level, args.boss, args.tint, args.tiles);
+    return try World.init(alloc, args.level, args.boss, args.tint, args.tiles, args.level_name); 
 }
