@@ -1,6 +1,5 @@
 const std = @import("std");
 const rl = @import("raylib.zig");
-const World = @import("World.zig");
 const c = @import("commons.zig");
 
 const Self = @This();

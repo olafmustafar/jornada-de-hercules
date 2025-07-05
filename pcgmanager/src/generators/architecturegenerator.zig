@@ -187,9 +187,10 @@ fn choose_random_available_direction(rnd: std.Random, current_pos: Position, ava
         }
     }
 
-    if (dir_i == 0) {
+    if (dir_i == 0 or dir_i == 1 and directions[0] == except) {
         return null;
     }
+
     var dir = directions[rnd.uintAtMost(usize, dir_i - 1)];
     while (dir == except) {
         dir = directions[rnd.uintAtMost(usize, dir_i - 1)];

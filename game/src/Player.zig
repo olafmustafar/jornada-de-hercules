@@ -1,7 +1,7 @@
 const std = @import("std");
 const rl = @import("raylib.zig");
-const World = @import("World.zig");
 const c = @import("commons.zig");
+const World = @import("World.zig");
 const AudioMgr = @import("AudioMgr.zig");
 
 const Self = @This();

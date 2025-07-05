@@ -9,7 +9,6 @@ const font_size = 20;
 finished: bool,
 show: bool,
 offset: f32,
-name: []const u8,
 dialog: []const []const u8,
 idx: usize,
 box_text_header: [0x100]u8,
@@ -23,7 +22,6 @@ pub fn init(name: []const u8, dialogs: []const []const u8) Self {
     const dialog_box = rl.LoadTextureFromImage(dialog_box_img);
 
     var self = Self{
-        .name = name,
         .dialog = dialogs,
         .idx = 0,
         .box_progress = 0,
@@ -35,9 +33,9 @@ pub fn init(name: []const u8, dialogs: []const []const u8) Self {
         .dialog_box = dialog_box,
     };
 
-    std.mem.copyForwards(u8, &self.box_text_header, self.name);
-    self.box_text_header[self.name.len] = ':';
-    self.box_text_header[self.name.len + 1] = 0;
+    std.mem.copyForwards(u8, &self.box_text_header, name);
+    self.box_text_header[name.len] = ':';
+    self.box_text_header[name.len + 1] = 0;
 
     return self;
 }

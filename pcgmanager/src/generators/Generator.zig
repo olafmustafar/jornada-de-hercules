@@ -48,7 +48,7 @@ pub fn GeneratorImpl(
         }
 
         pub fn wait_results(self: *Self) !std.ArrayList(Content) {
-            while ( self.queue.pop()) |instr| {
+            while (self.queue.pop()) |instr| {
                 const content = GenFn(self.gen_context, instr);
                 try self.result.append(content);
             }
@@ -94,17 +94,14 @@ pub fn GeneratorMultithreadImpl(
 
             while (true) {
                 {
-                    std.debug.print("{}: waiting next instruction\n", .{id});
                     ctx.mutex.lock();
                     defer ctx.mutex.unlock();
 
                     while (ctx.queue.items.len == 0 and !ctx.should_exit) ctx.thread_cv.wait(&ctx.mutex);
 
                     if (ctx.should_exit) {
-                        std.debug.print("{}: exiting\n", .{id});
                         break;
                     } else {
-                        std.debug.print("{}: popping queue\n", .{id});
                         instr_opt = ctx.queue.pop();
                         ctx.working += 1;
                     }
@@ -112,12 +109,9 @@ pub fn GeneratorMultithreadImpl(
                 ctx.cv.signal();
 
                 if (instr_opt) |instruction| {
-                    std.debug.print("{}: processing instruction\n", .{id});
-
                     const content = GenFn(ctx.gen_context, instruction);
 
                     {
-                        std.debug.print("{}: appending results\n", .{id});
                         ctx.mutex.lock();
                         defer ctx.mutex.unlock();
                         ctx.result.append(content) catch {
@@ -175,12 +169,10 @@ pub fn GeneratorMultithreadImpl(
         pub fn wait_results(self: Self) !std.ArrayList(Content) {
             self.shared.mutex.lock();
             defer self.shared.mutex.unlock();
-            std.debug.print("waiting finish {}\n", .{self.shared.queue.items.len});
 
             while (self.shared.queue.items.len != 0 or self.shared.working != 0) {
                 self.shared.cv.wait(&self.shared.mutex);
             }
-            std.debug.print("waiting finish OK {}\n", .{self.shared.queue.items.len});
 
             const results = try self.shared.result.clone();
             self.shared.result.clearAndFree();

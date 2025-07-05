@@ -92,7 +92,6 @@ fn combine_impl(self: Self, architecture: Architecture, rooms: Rooms, enemies_ma
         const x: usize = @intCast((x_shift + node.pos.x) * (room_w + 1));
         const y: usize = @intCast((y_shift + node.pos.y) * (room_h + 1));
 
-        std.debug.print("room_w: {d}\n", .{room_w});
         try level.room_rects.append(.{
             .x = @as(f32, @floatFromInt(x)) + 1,
             .y = @as(f32, @floatFromInt(y)) + 1,

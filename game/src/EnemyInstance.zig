@@ -24,10 +24,10 @@ move_target_timer: f32,
 activated: bool,
 player_hit: bool,
 
-pub fn init(self: *World, pos: rl.Vector2, enemy: Enemy) Self {
-    var ei = Self{
+pub fn init(world: *World, pos: rl.Vector2, enemy: Enemy) Self {
+    var self = Self{
         .alive = true,
-        .model = self.enemy_models.get(enemy.type).?,
+        .model = world.enemy_models.get(enemy.type).?,
         .animation = null,
         .angle = 0.0,
         .enemy = enemy,
@@ -44,25 +44,25 @@ pub fn init(self: *World, pos: rl.Vector2, enemy: Enemy) Self {
         .player_hit = false,
     };
 
-    if (self.enemy_animations.get(enemy.type)) |anim| {
-        ei.animation = anim.run;
+    if (world.enemy_animations.get(enemy.type)) |anim| {
+        self.animation = anim.run;
     }
     if (enemy.type == .boss) {
-        switch (self.boss_type) {
+        switch (world.boss_type) {
             .lion => {},
             .hydra => {
-                ei.radius = 0.5;
-                ei.enemy.velocity *= 0.5;
-                ei.enemy.health = 40;
-                ei.health_points = 40;
+                self.radius = 0.5;
+                self.enemy.velocity *= 0.5;
+                self.enemy.health = 40;
+                self.health_points = 40;
             },
             .stag => {
-                ei.enemy.velocity *= 1.5;
+                self.enemy.velocity *= 1.5;
             },
         }
     }
 
-    return ei;
+    return self;
 }
 
 pub fn update(self: *Self, curr_room: rl.Rectangle) !void {

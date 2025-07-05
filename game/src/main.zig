@@ -4,7 +4,6 @@ const PCGManager = @import("pcgmanager");
 const contents = PCGManager.Contents;
 const c = @import("commons.zig");
 const rl = @import("raylib.zig");
-const rll = @import("rlights.zig");
 const World = @import("World.zig");
 const SceneManager = @import("SceneManager.zig");
 const Menu = @import("Menu.zig");
